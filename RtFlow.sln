@@ -1,0 +1,40 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RtFlow.Pipelines.Core", "RtFlow.Pipelines.Core\RtFlow.Pipelines.Core.csproj", "{04088C87-AEC7-4645-9634-731D62A5111A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RtFlow.Pipelines.Extensions", "RtFlow.Pipelines.Extensions\RtFlow.Pipelines.Extensions.csproj", "{57087BD0-401E-447F-AC86-FE1B96EE33E4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RtFlow.Pipelines.Hosting", "RtFlow.Pipelines.Hosting\RtFlow.Pipelines.Hosting.csproj", "{18C0DBEB-0130-4437-A9BE-C665F410729A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RtFlow.Pipelines.Tests", "RtFlow.Pipelines.Tests\RtFlow.Pipelines.Tests.csproj", "{0D0885ED-E0F2-454F-A92E-6A283D294055}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{04088C87-AEC7-4645-9634-731D62A5111A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{04088C87-AEC7-4645-9634-731D62A5111A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{04088C87-AEC7-4645-9634-731D62A5111A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{04088C87-AEC7-4645-9634-731D62A5111A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{57087BD0-401E-447F-AC86-FE1B96EE33E4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{57087BD0-401E-447F-AC86-FE1B96EE33E4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{57087BD0-401E-447F-AC86-FE1B96EE33E4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{57087BD0-401E-447F-AC86-FE1B96EE33E4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{18C0DBEB-0130-4437-A9BE-C665F410729A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{18C0DBEB-0130-4437-A9BE-C665F410729A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{18C0DBEB-0130-4437-A9BE-C665F410729A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{18C0DBEB-0130-4437-A9BE-C665F410729A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0D0885ED-E0F2-454F-A92E-6A283D294055}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0D0885ED-E0F2-454F-A92E-6A283D294055}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0D0885ED-E0F2-454F-A92E-6A283D294055}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0D0885ED-E0F2-454F-A92E-6A283D294055}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
