@@ -7,16 +7,18 @@ namespace RtFlow.Pipelines.Tests
     public class PipelineSmokeTests
     {
         [Fact]
-        public async Task Million_Items_Pipeline_Completes_Correctly()
+        public async Task Million_Items_Pipeline_With_Logging_Completes_Correctly()
         {
             const int N = 15_000_000;
 
-            // 1) define your pipeline
+            // 1) define your pipeline, inserting a TransformBlock that prints each item
             var def = new PipelineDefinition<int, int>(
-                "double",
+                "double-and-log",
                 ct => PipelineBuilder
                         .BeginWith(new BufferBlock<int>(new() { CancellationToken = ct }))
-                        .LinkTo(new TransformBlock<int, int>(x => x * 2))
+                        .LinkTo(new TransformBlock<int, int>(
+                            x => x * 2,
+                            new ExecutionDataflowBlockOptions { CancellationToken = ct }))
                         .ToPipeline()
             );
 
@@ -49,8 +51,6 @@ namespace RtFlow.Pipelines.Tests
 
             // 6) verify count and sum of doubled values
             Assert.Equal(N, count);
-
-            // sum of 2*i for i=0..N-1 = 2 * (N-1)*N/2 = N*(N-1)
             long expectedSum = (long)N * (N - 1);
             Assert.Equal(expectedSum, sum);
         }

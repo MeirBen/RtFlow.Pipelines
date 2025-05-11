@@ -10,8 +10,8 @@ namespace RtFlow.Pipelines.Core
             string name,
             Func<CancellationToken, IPropagatorBlock<TIn, TOut>> factory)
         {
-            Name = name;
-            _factory = factory;
+            Name = name ?? throw new ArgumentNullException(nameof(name));
+            _factory = factory ?? throw new ArgumentNullException(nameof(factory));
         }
 
         // add this public helper:
