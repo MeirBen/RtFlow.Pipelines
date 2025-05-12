@@ -1,11 +1,12 @@
 using System.Threading.Tasks.Dataflow;
 
-namespace RtFlow.Pipelines.Core
+namespace RtFlow.Pipelines.Core;
+
+/// <summary>
+/// Base interface for all pipeline definitions.
+/// </summary>
+public interface IPipelineDefinition
 {
-    public interface IPipelineDefinition
-    {
-        string Name { get; }
-        // Returns a block that, when Complete() is called, will drain gracefully
-        IDataflowBlock Create(CancellationToken cancellationToken);
-    }
+    string Name { get; }
+    IDataflowBlock Create(CancellationToken ct);
 }
