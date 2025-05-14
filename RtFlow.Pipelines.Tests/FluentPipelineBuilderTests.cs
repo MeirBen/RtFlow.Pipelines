@@ -33,6 +33,32 @@ namespace RtFlow.Pipelines.Tests
         }
 
         [Fact]
+        public async Task TransformAsync_ProcessesValuesAsynchronously()
+        {
+            // Arrange: pipeline that multiplies by 2 asynchronously
+            var pipeline = FluentPipeline
+                .Create<int>(opts => opts.BoundedCapacity = 10)
+                .TransformAsync(x => Task.FromResult(x * 2))
+                .ToPipeline();
+
+            var results = new List<int>();
+            var receiver = Task.Run(async () =>
+            {
+                while (await DataflowBlock.OutputAvailableAsync(pipeline))
+                    results.Add(await DataflowBlock.ReceiveAsync(pipeline));
+            });
+
+            // Act
+            for (int i = 1; i <= 5; i++)
+                await pipeline.SendAsync(i);
+            pipeline.Complete();
+            await Task.WhenAll(receiver, pipeline.Completion);
+
+            // Assert
+            Assert.Equal(new[] { 2, 4, 6, 8, 10 }, results);
+        }
+
+        [Fact]
         public async Task Tap_InvokesSideEffect_AndPassesThrough()
         {
             // Arrange: pipeline that adds 1 then taps
@@ -41,6 +67,39 @@ namespace RtFlow.Pipelines.Tests
                 .Create<int>()
                 .Transform(x => x + 1)
                 .Tap(x => tapped.Add(x))
+                .ToPipeline();
+
+            var outputs = new List<int>();
+            var receiver = Task.Run(async () =>
+            {
+                while (await DataflowBlock.OutputAvailableAsync(pipeline))
+                    outputs.Add(await DataflowBlock.ReceiveAsync(pipeline));
+            });
+
+            // Act
+            for (int i = 0; i < 5; i++)
+                await pipeline.SendAsync(i);
+            pipeline.Complete();
+            await Task.WhenAll(receiver, pipeline.Completion);
+
+            // Assert
+            Assert.Equal(outputs, tapped);
+            Assert.Equal(new[] { 1, 2, 3, 4, 5 }, outputs);
+        }
+
+        [Fact]
+        public async Task TapAsync_InvokesSideEffect_AndPassesThrough()
+        {
+            // Arrange: pipeline that adds 1 then taps asynchronously
+            var tapped = new List<int>();
+            var pipeline = FluentPipeline
+                .Create<int>()
+                .Transform(x => x + 1)
+                .TapAsync(x =>
+                {
+                    tapped.Add(x);
+                    return Task.CompletedTask;
+                })
                 .ToPipeline();
 
             var outputs = new List<int>();
@@ -90,30 +149,45 @@ namespace RtFlow.Pipelines.Tests
         }
 
         [Fact]
-        public async Task WithPostCompletionAction_IsInvokedAfterCompletion()
+        public async Task ToSink_ConsumesAllItems()
         {
             // Arrange
             var results = new List<int>();
-            var invoked = false;
-            var pipeline = FluentPipeline
+            var target = FluentPipeline
                 .Create<int>()
-                .WithPostCompletionAction(_ => { invoked = true; })
-                .ToPipeline();
-
-            var receiver = Task.Run(async () =>
-            {
-                while (await DataflowBlock.OutputAvailableAsync(pipeline))
-                    results.Add(await DataflowBlock.ReceiveAsync(pipeline));
-            });
+                .ToSink(x => results.Add(x));
 
             // Act
-            await pipeline.SendAsync(42);
-            pipeline.Complete();
-            await pipeline.Completion;
+            await target.SendAsync(42);
+            await target.SendAsync(43);
+            target.Complete();
+            await target.Completion;
 
             // Assert
-            Assert.True(invoked);
-            Assert.Equal(new[] { 42 }, results);
+            Assert.Equal(new[] { 42, 43 }, results);
+        }
+
+        [Fact]
+        public async Task ToSinkAsync_ConsumesAllItemsAsynchronously()
+        {
+            // Arrange
+            var results = new List<int>();
+            var target = FluentPipeline
+                .Create<int>()
+                .ToSinkAsync(x =>
+                {
+                    results.Add(x);
+                    return Task.CompletedTask;
+                });
+
+            // Act
+            await target.SendAsync(42);
+            await target.SendAsync(43);
+            target.Complete();
+            await target.Completion;
+
+            // Assert
+            Assert.Equal(new[] { 42, 43 }, results);
         }
 
         [Fact]
@@ -189,6 +263,60 @@ namespace RtFlow.Pipelines.Tests
             Assert.Contains("[1,4]", outputs);
             Assert.Contains("[9,16]", outputs);
             Assert.Contains("[25]", outputs);
+        }
+
+        [Fact]
+        public async Task ToSink_WithBatchAndTransform_ProcessesAndConsumesItems()
+        {
+            // Arrange
+            var processedBatches = new List<string>();
+            var pipeline = FluentPipeline
+                .Create<int>()
+                .Batch(batchSize: 2)
+                .Transform(batch => $"Batch total: {batch.Sum()}")
+                .ToSinkAsync(async result =>
+                {
+                    // Simulate async processing
+                    await Task.Delay(10);
+                    processedBatches.Add(result);
+                });
+
+            // Act
+            for (int i = 1; i <= 5; i++)
+                await pipeline.SendAsync(i);
+
+            pipeline.Complete();
+            await pipeline.Completion;
+
+            // Assert
+            Assert.Equal(3, processedBatches.Count);
+            Assert.Equal("Batch total: 3", processedBatches[0]);  // 1+2
+            Assert.Equal("Batch total: 7", processedBatches[1]);  // 3+4
+            Assert.Equal("Batch total: 5", processedBatches[2]);  // 5
+        }
+
+        [Fact]
+        public async Task ToSink_WithTransform_ProcessesAndConsumesItems()
+        {
+            // Arrange
+            var results = new List<string>();
+            var pipeline = FluentPipeline
+                .Create<int>()
+                .Transform(x => $"Number: {x * 2}")
+                .ToSink(s => results.Add(s));
+
+            // Act
+            await pipeline.SendAsync(10);
+            await pipeline.SendAsync(20);
+            await pipeline.SendAsync(30);
+            pipeline.Complete();
+            await pipeline.Completion;
+
+            // Assert
+            Assert.Equal(3, results.Count);
+            Assert.Equal("Number: 20", results[0]);
+            Assert.Equal("Number: 40", results[1]);
+            Assert.Equal("Number: 60", results[2]);
         }
     }
 }
