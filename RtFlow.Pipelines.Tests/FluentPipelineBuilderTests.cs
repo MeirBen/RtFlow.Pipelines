@@ -228,17 +228,17 @@ namespace RtFlow.Pipelines.Tests
                 // square each item, with a bounded capacity too
                 .Transform(
                     x => x * x,
-                    new ExecutionDataflowBlockOptions { BoundedCapacity = 10 }
+                    opts => opts.BoundedCapacity = 10
                 )
                 // batch into arrays of 2
                 .Batch(
                     batchSize: 2,
-                    new GroupingDataflowBlockOptions { BoundedCapacity = 5 }
+                    opts => opts.BoundedCapacity = 5
                 )
                 // format each batch
                 .Transform(
                     arr => $"[{string.Join(',', arr)}]",
-                    new ExecutionDataflowBlockOptions { BoundedCapacity = 5 }
+                    opts => opts.BoundedCapacity = 5
                 )
                 // tap into your log
                 .Tap(s => logged.Add(s))

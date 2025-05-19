@@ -5,101 +5,90 @@ namespace RtFlow.Pipelines.Core;
 /// <summary>
 /// Defines a fluent interface for building dataflow pipelines.
 /// </summary>
-/// <typeparam name="TIn">The input type of the pipeline.</typeparam>
-/// <typeparam name="TOut">The output type of the pipeline.</typeparam>
+/// <typeparam name="TIn">Input type of the pipeline.</typeparam>
+/// <typeparam name="TOut">Output type of the pipeline.</typeparam>
 public interface IFluentPipelineBuilder<TIn, TOut>
 {
     /// <summary>
     /// Adds a synchronous transformation step to the pipeline.
     /// </summary>
-    /// <typeparam name="TNext">The type of the output from this transformation.</typeparam>
-    /// <param name="selector">The function to transform each element.</param>
-    /// <param name="options">Options for the transform block, or null to use defaults.</param>
-    /// <returns>A builder for the next step in the pipeline.</returns>
-    IFluentPipelineBuilder<TIn, TNext> Transform<TNext>(
-        Func<TOut, TNext> selector, 
-        ExecutionDataflowBlockOptions options = null);
-    
+    /// <typeparam name="TNext">Output type of the transformation.</typeparam>
+    /// <param name="selector">Function to transform each element.</param>
+    /// <param name="configure">Optional action to configure block options.</param>
+    public IFluentPipelineBuilder<TIn, TNext> Transform<TNext>(
+        Func<TOut, TNext> selector,
+        Action<ExecutionDataflowBlockOptions> configure = null);
+
     /// <summary>
     /// Adds an asynchronous transformation step to the pipeline.
     /// </summary>
-    /// <typeparam name="TNext">The type of the output from this transformation.</typeparam>
-    /// <param name="selector">The asynchronous function to transform each element.</param>
-    /// <param name="options">Options for the transform block, or null to use defaults.</param>
-    /// <returns>A builder for the next step in the pipeline.</returns>
-    IFluentPipelineBuilder<TIn, TNext> TransformAsync<TNext>(
+    /// <typeparam name="TNext">Output type of the transformation.</typeparam>
+    /// <param name="selector">Async function to transform each element.</param>
+    /// <param name="configure">Optional action to configure block options.</param>
+    public IFluentPipelineBuilder<TIn, TNext> TransformAsync<TNext>(
         Func<TOut, Task<TNext>> selector,
-        ExecutionDataflowBlockOptions options = null);
-    
+        Action<ExecutionDataflowBlockOptions> configure = null);
+
     /// <summary>
-    /// Adds an asynchronous transformation step to the pipeline with cancellation support.
+    /// Adds an asynchronous transformation step with cancellation support.
     /// </summary>
-    /// <typeparam name="TNext">The type of the output from this transformation.</typeparam>
-    /// <param name="selector">The asynchronous function to transform each element with cancellation support.</param>
-    /// <param name="options">Options for the transform block, or null to use defaults.</param>
-    /// <returns>A builder for the next step in the pipeline.</returns>
-    IFluentPipelineBuilder<TIn, TNext> TransformAsync<TNext>(
+    /// <typeparam name="TNext">Output type of the transformation.</typeparam>
+    /// <param name="selector">Async function with cancellation support.</param>
+    /// <param name="configure">Optional action to configure block options.</param>
+    public IFluentPipelineBuilder<TIn, TNext> TransformAsync<TNext>(
         Func<TOut, CancellationToken, Task<TNext>> selector,
-        ExecutionDataflowBlockOptions options = null);
-        
+        Action<ExecutionDataflowBlockOptions> configure = null);
+
     /// <summary>
-    /// Adds a side effect that doesn't change the data but performs an operation on each element.
+    /// Adds a side effect without changing the data.
     /// </summary>
-    /// <param name="sideEffect">The action to perform on each element.</param>
-    /// <returns>A builder configured with the tap operation.</returns>
+    /// <param name="sideEffect">Action to perform on each element.</param>
     IFluentPipelineBuilder<TIn, TOut> Tap(Action<TOut> sideEffect);
-    
+
     /// <summary>
-    /// Adds a side effect that doesn't change the data but performs an asynchronous operation on each element.
+    /// Adds an asynchronous side effect without changing the data.
     /// </summary>
-    /// <param name="sideEffect">The asynchronous action to perform on each element.</param>
-    /// <returns>A builder configured with the tap operation.</returns>
+    /// <param name="sideEffect">Async action to perform on each element.</param>
     IFluentPipelineBuilder<TIn, TOut> TapAsync(Func<TOut, Task> sideEffect);
-    
+
     /// <summary>
-    /// Adds a side effect that doesn't change the data but performs an asynchronous operation on each element with cancellation support.
+    /// Adds an asynchronous side effect with cancellation support.
     /// </summary>
-    /// <param name="sideEffect">The asynchronous action with cancellation support to perform on each element.</param>
-    /// <returns>A builder configured with the tap operation.</returns>
+    /// <param name="sideEffect">Async action with cancellation support.</param>
     IFluentPipelineBuilder<TIn, TOut> TapAsync(Func<TOut, CancellationToken, Task> sideEffect);
-    
+
     /// <summary>
     /// Groups elements into batches of the specified size.
     /// </summary>
-    /// <param name="batchSize">The size of each batch.</param>
-    /// <param name="options">Options for the batch block, or null to use defaults.</param>
-    /// <returns>A builder for the next step in the pipeline with arrays as output.</returns>
+    /// <param name="batchSize">Size of each batch.</param>
+    /// <param name="configure">Optional action to configure batch options.</param>
     IFluentPipelineBuilder<TIn, TOut[]> Batch(
         int batchSize,
-        GroupingDataflowBlockOptions options = null);
-    
+        Action<GroupingDataflowBlockOptions> configure = null);
+
     /// <summary>
     /// Builds and returns the pipeline as a propagator block.
     /// </summary>
-    /// <returns>A propagator block that represents the entire pipeline.</returns>
     IPropagatorBlock<TIn, TOut> ToPipeline();
-    
+
     /// <summary>
-    /// Terminates the pipeline with an action that consumes each output element.
+    /// Terminates the pipeline with an action that consumes each element.
     /// </summary>
-    /// <param name="action">The action to perform on each output element.</param>
-    /// <param name="options">Options for the action block, or null to use defaults.</param>
-    /// <returns>A target block that represents the entire pipeline.</returns>
-    ITargetBlock<TIn> ToSink(Action<TOut> action, ExecutionDataflowBlockOptions options = null);
-    
+    /// <param name="action">Action to perform on each output element.</param>
+    /// <param name="configure">Optional action to configure block options.</param>
+    ITargetBlock<TIn> ToSink(Action<TOut> action, Action<ExecutionDataflowBlockOptions> configure = null);
+
     /// <summary>
-    /// Terminates the pipeline with an asynchronous action that consumes each output element.
+    /// Terminates the pipeline with an asynchronous action.
     /// </summary>
-    /// <param name="action">The asynchronous action to perform on each output element.</param>
-    /// <param name="options">Options for the action block, or null to use defaults.</param>
-    /// <returns>A target block that represents the entire pipeline.</returns>
-    ITargetBlock<TIn> ToSinkAsync(Func<TOut, Task> action, ExecutionDataflowBlockOptions options = null);
-    
+    /// <param name="action">Async action to perform on each output element.</param>
+    /// <param name="configure">Optional action to configure block options.</param>
+    ITargetBlock<TIn> ToSinkAsync(Func<TOut, Task> action, Action<ExecutionDataflowBlockOptions> configure = null);
+
     /// <summary>
-    /// Terminates the pipeline with an asynchronous action with cancellation support that consumes each output element.
+    /// Terminates the pipeline with an asynchronous action with cancellation support.
     /// </summary>
-    /// <param name="action">The asynchronous action with cancellation support to perform on each output element.</param>
-    /// <param name="options">Options for the action block, or null to use defaults.</param>
-    /// <returns>A target block that represents the entire pipeline.</returns>
-    ITargetBlock<TIn> ToSinkAsync(Func<TOut, CancellationToken, Task> action, ExecutionDataflowBlockOptions options = null);
+    /// <param name="action">Async action with cancellation support.</param>
+    /// <param name="configure">Optional action to configure block options.</param>
+    ITargetBlock<TIn> ToSinkAsync(Func<TOut, CancellationToken, Task> action, Action<ExecutionDataflowBlockOptions> configure = null);
 }
