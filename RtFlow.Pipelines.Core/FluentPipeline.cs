@@ -22,7 +22,7 @@ public static class FluentPipeline
         configureBuffer?.Invoke(opts);
 
         var buffer = new BufferBlock<T>(opts);
-        var inner = PipelineBuilder.BeginWith<T, T>(buffer);
+        var inner = PipelineBuilder.BeginWith(buffer);
         return new FluentPipelineBuilder<T, T>(inner, cancellationToken);
     }
 
@@ -30,7 +30,7 @@ public static class FluentPipeline
     /// Start a pipeline from an existing propagator block.
     /// </summary>
     public static IFluentPipelineBuilder<TIn, TOut> BeginWith<TIn, TOut>(
-        IPropagatorBlock<TIn, TOut> head, 
+        IPropagatorBlock<TIn, TOut> head,
         CancellationToken cancellationToken = default)
     {
         var inner = PipelineBuilder.BeginWith(head);
