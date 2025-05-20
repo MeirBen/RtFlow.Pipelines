@@ -11,7 +11,6 @@ RtFlow.Pipelines is a powerful, fluent API for building high-throughput, resilie
 * **Type-safe** - Strongly-typed pipeline stages with compile-time checking
 * **Back-pressure & Bounded Capacity** - Control flow rate with TPL Dataflow's built-in mechanisms
 * **Cancellation Support** - Graceful pipeline shutdown with CancellationToken
-* **Resilience Policies** - Retry mechanisms via Polly integration
 * **Batching** - Group elements into batches for efficient processing
 * **Hosting Integration** - Lifecycle management via HostedService in ASP.NET Core
 * **Side-effect Support** - Add monitoring, logging, or metrics collection without changing data flow
@@ -20,7 +19,6 @@ RtFlow.Pipelines is a powerful, fluent API for building high-throughput, resilie
 
 ```bash
 dotnet add package RtFlow.Pipelines.Core
-dotnet add package RtFlow.Pipelines.Extensions
 dotnet add package RtFlow.Pipelines.Hosting
 ```
 
@@ -97,21 +95,6 @@ var pipeline = FluentPipeline.BeginWith(customBlock)
 .ToSinkAsync(async item => await SaveToDbAsync(item))
 ```
 
-## Resilience with Polly
-
-```csharp
-using RtFlow.Pipelines.Extensions;
-
-// Add retry policy to a function
-Func<Order, Task<ProcessedOrder>> processOrder = /* ... */;
-var resilientProcessor = processOrder.WithRetry(retries: 3);
-
-// Use in pipeline
-FluentPipeline.Create<Order>()
-    .TransformAsync(order => resilientProcessor(order))
-    .ToPipeline();
-```
-
 ## Hosting Integration
 
 Integrate with ASP.NET Core hosting for lifecycle management:
@@ -147,7 +130,57 @@ FluentPipeline.Create<Order>()
     .ToPipeline();
 ```
 
----
+## Cancellation Support
+
+RtFlow.Pipelines provides robust cancellation support, allowing you to gracefully stop processing:
+
+```csharp
+// Create a cancellation token source
+var cts = new CancellationTokenSource();
+
+// Create a pipeline with cancellation support
+var pipeline = FluentPipeline
+    .Create<int>(cancellationToken: cts.Token)
+    .TransformAsync(async (x, token) => {
+        await Task.Delay(100, token); // This will respect cancellation
+        return x * 2;
+    })
+    .ToSink(x => Console.WriteLine(x));
+
+// Send data
+await pipeline.SendAsync(42);
+
+// Later, when you need to stop processing
+cts.Cancel();
+```
+
+## Pipeline Factory
+
+The `PipelineFactory` provides integration with ASP.NET Core's hosting lifecycle:
+
+```csharp
+// Register in DI container
+services.AddSingleton<IPipelineFactory, PipelineFactory>();
+
+// Inject and use in your services
+public class MyService 
+{
+    private readonly IPipelineFactory _factory;
+    
+    public MyService(IPipelineFactory factory) 
+    {
+        _factory = factory;
+    }
+    
+    public IPropagatorBlock<int, string> CreatePipeline() 
+    {
+        // Creates a pipeline that automatically observes the application's shutdown signal
+        return _factory.Create<int>()
+            .Transform(x => x.ToString())
+            .ToPipeline();
+    }
+}
+```
 
 ## License
 
@@ -155,13 +188,11 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Testing
 
-A built-in smoke test pushes **1 000 000** items through a sample pipeline and checks accuracy:
+The library includes comprehensive tests for core functionality:
 
 ```bash
 dotnet test RtFlow.Pipelines.Tests
 ```
-
----
 
 ## Contributing
 
@@ -170,8 +201,6 @@ dotnet test RtFlow.Pipelines.Tests
 3. Open a PR.  
 
 Follow the `.editorconfig`, keep the CI green, and add meaningful documentation.
-
----
 
 ## License
 
