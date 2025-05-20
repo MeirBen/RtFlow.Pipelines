@@ -3,102 +3,155 @@
 <!-- [![Build Status](https://img.shields.io/github/actions/workflow/status/MeirBen/RtFlow.Pipelines/ci.yml?branch=main)](https://github.com/MeirBen/RtFlow.Pipelines/actions)  
 [![NuGet](https://img.shields.io/nuget/v/RtFlow.Pipelines.Core.svg)](https://www.nuget.org/packages/RtFlow.Pipelines.Core) -->
 
-RtFlow.Pipelines provides a fluent, resilient, and observable wrapper over **TPL Dataflow** for building high-throughput, in-memory stream-processing pipelines.
+RtFlow.Pipelines is a powerful, fluent API for building high-throughput, resilient data processing pipelines using .NET's TPL Dataflow library. It simplifies the creation of complex data processing workflows with a clean, chainable syntax.
 
-**Features**
+## Key Features
 
-* Fluent DSL – `PipelineBuilder.BeginWith(...).LinkTo(...).ToPipeline()`
-* Back-pressure & cancellation via `ExecutionDataflowBlockOptions`
-* Retry & circuit-breaker policies with [Polly](https://github.com/App-vNext/Polly)
-* Metrics & logging hooks (`ILogger`, `System.Diagnostics.Metrics`)
-* DI-friendly – register pipelines as `IPipelineDefinition`, run via `PipelineHostedService`
+* **Fluent API** - Build complex data pipelines with an intuitive, chainable syntax
+* **Type-safe** - Strongly-typed pipeline stages with compile-time checking
+* **Back-pressure & Bounded Capacity** - Control flow rate with TPL Dataflow's built-in mechanisms
+* **Cancellation Support** - Graceful pipeline shutdown with CancellationToken
+* **Resilience Policies** - Retry mechanisms via Polly integration
+* **Batching** - Group elements into batches for efficient processing
+* **Hosting Integration** - Lifecycle management via HostedService in ASP.NET Core
+* **Side-effect Support** - Add monitoring, logging, or metrics collection without changing data flow
 
----
+## Installation
 
-## Getting Started
-
-### Installation
 ```bash
 dotnet add package RtFlow.Pipelines.Core
 dotnet add package RtFlow.Pipelines.Extensions
 dotnet add package RtFlow.Pipelines.Hosting
 ```
 
-### Quickstart
+## Quick Start
+
 ```csharp
 using RtFlow.Pipelines.Core;
-using System.Threading;
 using System.Threading.Tasks.Dataflow;
 
-// 1) define your pipeline
-var def = new PipelineDefinition<int,int>(
-    "DoubleInts",
-    ct => PipelineBuilder
-            .BeginWith(new BufferBlock<int>(
-                new() { BoundedCapacity = 100, CancellationToken = ct }))
-            .LinkTo(new TransformBlock<int,int>(x => x * 2))
-            .ToPipeline()
-);
+// Create a simple pipeline that doubles integers
+var pipeline = FluentPipeline.Create<int>(opts => { 
+        opts.BoundedCapacity = 100; 
+    })
+    .Transform(x => x * 2)
+    .ToPipeline();
 
-// 2) create & use it
-var pipeline = def.Create(CancellationToken.None);
+// Send data through the pipeline
 await pipeline.SendAsync(5);
 pipeline.Complete();
-await pipeline.Completion;
-int result = await DataflowBlock.ReceiveAsync<int>(pipeline);   // 10
+
+// Receive the processed result
+int result = await DataflowBlock.ReceiveAsync<int>(pipeline); // 10
 ```
 
----
+## Core Components
 
-## Core Concepts
+### FluentPipeline
 
-| Concept | What it does |
-|---------|--------------|
-| **`PipelineBuilder`** | Fluent API to build a chain/graph of blocks. |
-| **`PipelineDefinition<TIn,TOut>`** | Named factory that materialises a pipeline and supports graceful cancellation. |
-| **`PipelineHostedService`** | Starts all registered definitions on app start and awaits completion on shutdown. |
+The main entry point for creating pipelines. Provides static methods to start building a pipeline.
 
----
+```csharp
+// Create a pipeline with a buffer block
+var pipeline = FluentPipeline.Create<Order>()
+    .Transform(order => EnrichOrder(order))
+    .Batch(10)
+    .Transform(batch => ProcessBatch(batch))
+    .ToPipeline();
 
-## Extensions & Policies
+// Start with a custom block
+var customBlock = new TransformBlock<string, int>(s => int.Parse(s));
+var pipeline = FluentPipeline.BeginWith(customBlock)
+    .Transform(i => i * 2)
+    .ToPipeline();
+```
+
+### Transformation Operations
+
+```csharp
+// Synchronous transformation
+.Transform(item => ProcessItem(item))
+
+// Asynchronous transformation
+.TransformAsync(async item => await ProcessItemAsync(item))
+
+// Asynchronous with cancellation
+.TransformAsync(async (item, ct) => await ProcessItemAsync(item, ct))
+
+// Add side-effects without changing data
+.Tap(item => Console.WriteLine($"Processing: {item}"))
+.TapAsync(async item => await LogItemAsync(item))
+
+// Batch processing
+.Batch(100)
+```
+
+### Terminal Operations
+
+```csharp
+// Convert to TPL Dataflow IPropagatorBlock
+.ToPipeline()
+
+// Terminate with an action (sink)
+.ToSink(item => Console.WriteLine(item))
+.ToSinkAsync(async item => await SaveToDbAsync(item))
+```
+
+## Resilience with Polly
 
 ```csharp
 using RtFlow.Pipelines.Extensions;
-using Polly;
 
-// wrap a fragile handler in a retry policy
-Func<RawEvent,Task<EnrichedEvent>> enrich = /* … */;
-var safeEnrich = enrich.WithRetry(retries: 3);
+// Add retry policy to a function
+Func<Order, Task<ProcessedOrder>> processOrder = /* ... */;
+var resilientProcessor = processOrder.WithRetry(retries: 3);
 
-// execution options
-var block = new TransformBlock<RawEvent,EnrichedEvent>(
-    safeEnrich,
-    new ExecutionDataflowBlockOptions {
-        MaxDegreeOfParallelism = 4,
-        BoundedCapacity        = 50,
-        CancellationToken      = ct
-    });
+// Use in pipeline
+FluentPipeline.Create<Order>()
+    .TransformAsync(order => resilientProcessor(order))
+    .ToPipeline();
 ```
-
----
 
 ## Hosting Integration
 
+Integrate with ASP.NET Core hosting for lifecycle management:
+
 ```csharp
-// Program.cs / Startup.cs
-services.AddSingleton<IPipelineDefinition>(sp =>
-    new PipelineDefinition<Order,EnrichedOrder>(
-        "OrderEnrichment",
-        ct => PipelineBuilder
-                .BeginWith(new BufferBlock<Order>(new() { CancellationToken = ct }))
-                .LinkTo(new TransformBlock<Order,RawEvent>(ProcessRawAsync))
-                .LinkTo(new TransformBlock<RawEvent,EnrichedOrder>(safeEnrich))
-                .ToPipeline()
-));
+// In Program.cs or Startup.cs
+services.AddSingleton<IPipelineDefinition>(sp => 
+    new PipelineDefinition<Order, ProcessedOrder>(
+        "OrderProcessing",
+        ct => FluentPipeline.Create<Order>(opts => { 
+                opts.CancellationToken = ct; 
+            })
+            .TransformAsync(async order => await ProcessOrderAsync(order))
+            .ToPipeline()
+    ));
+
 services.AddHostedService<PipelineHostedService>();
 ```
 
+## Advanced Configuration
+
+Configure execution options for fine-grained control:
+
+```csharp
+FluentPipeline.Create<Order>()
+    .Transform(
+        order => EnrichOrder(order),
+        opts => {
+            opts.MaxDegreeOfParallelism = 4;
+            opts.BoundedCapacity = 100;
+            opts.EnsureOrdered = true;
+        })
+    .ToPipeline();
+```
+
 ---
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Testing
 
