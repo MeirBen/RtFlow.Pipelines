@@ -1,3 +1,6 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using RtFlow.Pipelines.Core;
 using Xunit;
@@ -10,24 +13,23 @@ namespace RtFlow.Pipelines.Tests
         public async Task Pipeline_Should_Stop_Processing_When_Cancelled()
         {
             // Arrange
-            var cts = new CancellationTokenSource();
-            var processingComplete = new TaskCompletionSource<bool>();
-            var cancellationDetected = new TaskCompletionSource<bool>();
-            var itemsProcessed = 0;
-            var processingDelay = 100; // Longer delay to ensure consistent behavior
-            
+            var cts                = new CancellationTokenSource();
+            var processingComplete = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var cancellationDetected = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var itemsProcessed     = 0;
+            var processingDelay    = 100;
+
             var pipeline = FluentPipeline
                 .Create<int>(cancellationToken: cts.Token)
                 .TransformAsync(async (x, token) =>
                 {
-                    try 
+                    try
                     {
                         await Task.Delay(processingDelay, token);
                         return x * 2;
                     }
                     catch (OperationCanceledException)
                     {
-                        // Signal that cancellation was detected in transform
                         cancellationDetected.TrySetResult(true);
                         throw;
                     }
@@ -36,76 +38,57 @@ namespace RtFlow.Pipelines.Tests
                 {
                     try
                     {
-                        // Count items processed
-                        Interlocked.Increment(ref itemsProcessed);
-                        
-                        // Signal that we've processed at least one item
-                        if (itemsProcessed == 1)
-                        {
+                        var count = Interlocked.Increment(ref itemsProcessed);
+                        if (count == 1)
                             processingComplete.TrySetResult(true);
-                        }
-                        
                         await Task.Delay(10, token);
                     }
                     catch (OperationCanceledException)
                     {
-                        // Signal that cancellation was detected
                         cancellationDetected.TrySetResult(true);
                         throw;
                     }
                 });
 
-            // Act: start sending items
+            // Act: send a bunch, wait for one to complete, then cancel
             for (int i = 1; i <= 10; i++)
-            {
                 await pipeline.SendAsync(i);
-            }
-            
-            // Wait for at least one item to be processed
+
+            // wait up to 2s for first item to land
             await processingComplete.Task.WaitAsync(TimeSpan.FromSeconds(2));
-            
-            // Cancel the pipeline
+
             cts.Cancel();
-            
-            // Wait for cancellation to be detected or timeout
-            var cancellationTask = await Task.WhenAny(
-                cancellationDetected.Task,
-                Task.Delay(2000));
-            
-            // Assert
-            Assert.Equal(cancellationDetected.Task, cancellationTask);
-            
-            // Check that not all 10 items were processed (due to cancellation)
-            Assert.True(itemsProcessed < 10, 
-                $"Expected fewer than 10 items to be processed due to cancellation, but got {itemsProcessed}");
+
+            // wait up to 2s for the cancellation hook to fire
+            await cancellationDetected.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+            // Assert: not *all* items could have been processed
+            Assert.True(itemsProcessed < 10,
+                $"Expected fewer than 10 items to be processed after cancel, got {itemsProcessed}");
         }
 
         [Fact]
         public async Task Global_Cancellation_Should_Propagate_To_All_Blocks()
         {
             // Arrange
-            var cts = new CancellationTokenSource();
-            var processingStarted = new TaskCompletionSource<bool>();
-            var cancellationDetected = new TaskCompletionSource<bool>();
+            var cts                = new CancellationTokenSource();
+            var processingStarted  = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var cancellationDetected = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             var transformCompleted = false;
-            var sinkCompleted = false;
+            var sinkCompleted      = false;
 
             var pipeline = FluentPipeline
                 .Create<int>(cancellationToken: cts.Token)
-                // Add a transform step to test cancellation propagation
-                .Transform(x => 
+                .Transform(x =>
                 {
-                    // Signal that processing started
                     processingStarted.TrySetResult(true);
                     return x * 2;
                 })
-                // Add an async transform to test cancellation in async operations
                 .TransformAsync(async (x, token) =>
                 {
                     try
                     {
-                        // Add a longer delay to give time to cancel
-                        await Task.Delay(1000, token);
+                        await Task.Delay(1_000, token);
                         transformCompleted = true;
                         return $"Value: {x}";
                     }
@@ -115,44 +98,34 @@ namespace RtFlow.Pipelines.Tests
                         throw;
                     }
                 })
-                // Add a sink to verify cancellation reaches the end
-                .ToSinkAsync(async (s, token) => 
+                .ToSinkAsync(async (s, token) =>
                 {
                     try
                     {
-                        // This shouldn't execute if cancellation works properly
                         await Task.Delay(50, token);
                         sinkCompleted = true;
                     }
                     catch (OperationCanceledException)
                     {
-                        // Expected outcome if cancellation propagates correctly
+                        // swallow
                     }
                 });
 
-            // Act - Send an item to the pipeline
+            // Act
             await pipeline.SendAsync(42);
-            
-            // Wait for processing to start with timeout
-            var startTask = await Task.WhenAny(
-                processingStarted.Task,
-                Task.Delay(1000));
-            
-            // Verify processing started
-            Assert.Equal(processingStarted.Task, startTask);
-            
-            // Cancel before the async operations complete
+
+            // wait up to 2s for the sync-Transform to fire
+            await processingStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+            // now cancel
             cts.Cancel();
-            
-            // Wait for cancellation to be detected or timeout
-            var cancellationTask = await Task.WhenAny(
-                cancellationDetected.Task, 
-                Task.Delay(2000));
+
+            // wait up to 2s for the async-Transform's catch to fire
+            await cancellationDetected.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
             // Assert
-            Assert.Equal(cancellationDetected.Task, cancellationTask);
-            Assert.False(transformCompleted, "Transform should not complete due to cancellation");
-            Assert.False(sinkCompleted, "Sink should not complete due to cancellation");
+            Assert.False(transformCompleted, "Transform should not complete after cancellation");
+            Assert.False(sinkCompleted,      "Sink should not complete after cancellation");
         }
     }
 }
