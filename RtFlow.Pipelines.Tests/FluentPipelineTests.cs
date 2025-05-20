@@ -4,10 +4,13 @@ using Xunit;
 
 namespace RtFlow.Pipelines.Tests
 {
-    public class FluentPipelineBuilderTests
+    /// <summary>
+    /// Tests for the core pipeline transformation functionality without cancellation.
+    /// </summary>
+    public class FluentPipelineTests
     {
         [Fact]
-        public async Task Transform_DoublesValues_Correctly()
+        public async Task Transform_ProcessesValues_Correctly()
         {
             // Arrange: pipeline that multiplies by 2
             var pipeline = FluentPipeline
@@ -88,39 +91,6 @@ namespace RtFlow.Pipelines.Tests
         }
 
         [Fact]
-        public async Task TapAsync_InvokesSideEffect_AndPassesThrough()
-        {
-            // Arrange: pipeline that adds 1 then taps asynchronously
-            var tapped = new List<int>();
-            var pipeline = FluentPipeline
-                .Create<int>()
-                .Transform(x => x + 1)
-                .TapAsync(x =>
-                {
-                    tapped.Add(x);
-                    return Task.CompletedTask;
-                })
-                .ToPipeline();
-
-            var outputs = new List<int>();
-            var receiver = Task.Run(async () =>
-            {
-                while (await DataflowBlock.OutputAvailableAsync(pipeline))
-                    outputs.Add(await DataflowBlock.ReceiveAsync(pipeline));
-            });
-
-            // Act
-            for (int i = 0; i < 5; i++)
-                await pipeline.SendAsync(i);
-            pipeline.Complete();
-            await Task.WhenAll(receiver, pipeline.Completion);
-
-            // Assert
-            Assert.Equal(outputs, tapped);
-            Assert.Equal(new[] { 1, 2, 3, 4, 5 }, outputs);
-        }
-
-        [Fact]
         public async Task Batch_GroupsItems_CorrectlyEvenIfIncomplete()
         {
             // Arrange: batches of 3
@@ -168,29 +138,6 @@ namespace RtFlow.Pipelines.Tests
         }
 
         [Fact]
-        public async Task ToSinkAsync_ConsumesAllItemsAsynchronously()
-        {
-            // Arrange
-            var results = new List<int>();
-            var target = FluentPipeline
-                .Create<int>()
-                .ToSinkAsync(x =>
-                {
-                    results.Add(x);
-                    return Task.CompletedTask;
-                });
-
-            // Act
-            await target.SendAsync(42);
-            await target.SendAsync(43);
-            target.Complete();
-            await target.Completion;
-
-            // Assert
-            Assert.Equal(new[] { 42, 43 }, results);
-        }
-
-        [Fact]
         public async Task BeginWith_CustomHead_AllowsAnyStartingBlock()
         {
             // Arrange: start with a TransformBlock<string,string>
@@ -223,24 +170,19 @@ namespace RtFlow.Pipelines.Tests
             // Arrange
             var logged = new List<string>();
             var pipeline = FluentPipeline
-                // buffer with capacity 20
                 .Create<int>(opts => opts.BoundedCapacity = 20)
-                // square each item, with a bounded capacity too
                 .Transform(
                     x => x * x,
                     opts => opts.BoundedCapacity = 10
                 )
-                // batch into arrays of 2
                 .Batch(
                     batchSize: 2,
                     opts => opts.BoundedCapacity = 5
                 )
-                // format each batch
                 .Transform(
                     arr => $"[{string.Join(',', arr)}]",
                     opts => opts.BoundedCapacity = 5
                 )
-                // tap into your log
                 .Tap(s => logged.Add(s))
                 .ToPipeline();
 
@@ -263,6 +205,62 @@ namespace RtFlow.Pipelines.Tests
             Assert.Contains("[1,4]", outputs);
             Assert.Contains("[9,16]", outputs);
             Assert.Contains("[25]", outputs);
+        }
+
+        [Fact]
+        public async Task TapAsync_InvokesSideEffect_AndPassesThrough()
+        {
+            // Arrange: pipeline that adds 1 then taps asynchronously
+            var tapped = new List<int>();
+            var pipeline = FluentPipeline
+                .Create<int>()
+                .Transform(x => x + 1)
+                .TapAsync(x =>
+                {
+                    tapped.Add(x);
+                    return Task.CompletedTask;
+                })
+                .ToPipeline();
+
+            var outputs = new List<int>();
+            var receiver = Task.Run(async () =>
+            {
+                while (await DataflowBlock.OutputAvailableAsync(pipeline))
+                    outputs.Add(await DataflowBlock.ReceiveAsync(pipeline));
+            });
+
+            // Act
+            for (int i = 0; i < 5; i++)
+                await pipeline.SendAsync(i);
+            pipeline.Complete();
+            await Task.WhenAll(receiver, pipeline.Completion);
+
+            // Assert
+            Assert.Equal(outputs, tapped);
+            Assert.Equal(new[] { 1, 2, 3, 4, 5 }, outputs);
+        }
+
+        [Fact]
+        public async Task ToSinkAsync_ConsumesAllItemsAsynchronously()
+        {
+            // Arrange
+            var results = new List<int>();
+            var target = FluentPipeline
+                .Create<int>()
+                .ToSinkAsync(x =>
+                {
+                    results.Add(x);
+                    return Task.CompletedTask;
+                });
+
+            // Act
+            await target.SendAsync(42);
+            await target.SendAsync(43);
+            target.Complete();
+            await target.Completion;
+
+            // Assert
+            Assert.Equal(new[] { 42, 43 }, results);
         }
 
         [Fact]

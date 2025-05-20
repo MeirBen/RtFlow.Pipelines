@@ -4,6 +4,10 @@ using Xunit;
 
 namespace RtFlow.Pipelines.Tests
 {
+    /// <summary>
+    /// Tests that verify pipeline cancellation behavior.
+    /// These tests focus on how pipelines respond to cancellation tokens and requests.
+    /// </summary>
     public class CancellationTests
     {
         [Fact]

@@ -5,6 +5,9 @@ using Xunit;
 
 namespace RtFlow.Pipelines.Tests
 {
+    /// <summary>
+    /// A fake implementation of IHostApplicationLifetime for testing.
+    /// </summary>
     public class FakeHostApplicationLifetime : IHostApplicationLifetime
     {
         private readonly CancellationTokenSource _cts = new();
@@ -14,6 +17,10 @@ namespace RtFlow.Pipelines.Tests
         public void StopApplication() => _cts.Cancel();
     }
 
+    /// <summary>
+    /// Tests that verify integration with host lifecycle and factory functionality.
+    /// These tests focus on how pipelines interact with the host application lifetime.
+    /// </summary>
     public class PipelineFactoryTests
     {
         [Fact]
