@@ -119,7 +119,24 @@ namespace RtFlow.Pipelines.Core
             {
                 CancellationToken = _cancellationToken
             };
+            
+            // If no BoundedCapacity is specified, set it to at least batchSize
+            // This is required as BatchBlock requires BoundedCapacity >= batchSize
+            // BUGFIX: Without this check, the pipeline would throw ArgumentOutOfRangeException
+            if (opts.BoundedCapacity < batchSize)
+            {
+                opts.BoundedCapacity = batchSize;
+            }
+            
             configure?.Invoke(opts);
+            
+            // Re-check after configure is called to ensure BoundedCapacity is still valid
+            // This ensures that even if the user sets a smaller BoundedCapacity in the configure action,
+            // we still ensure it's at least equal to batchSize to prevent exceptions
+            if (opts.BoundedCapacity < batchSize)
+            {
+                opts.BoundedCapacity = batchSize;
+            }
 
             var block = new BatchBlock<TOut>(batchSize, opts);
             var nextBuilder = _inner.LinkTo(block);

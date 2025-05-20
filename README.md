@@ -19,6 +19,7 @@ RtFlow.Pipelines is a powerful, fluent API for building high-throughput, resilie
 
 ```bash
 dotnet add package RtFlow.Pipelines.Core
+dotnet add package RtFlow.Pipelines.Extensions
 dotnet add package RtFlow.Pipelines.Hosting
 ```
 
