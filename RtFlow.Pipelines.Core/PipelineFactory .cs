@@ -17,5 +17,5 @@ public class PipelineFactory : IPipelineFactory
         IPropagatorBlock<TIn, TOut> head,
         Action<ExecutionDataflowBlockOptions> cfg = null)
         // and here <TIn, TOut>
-        => FluentPipeline.BeginWith<TIn, TOut>(head, _stopping);
+        => FluentPipeline.BeginWith(head, _stopping);
 }
