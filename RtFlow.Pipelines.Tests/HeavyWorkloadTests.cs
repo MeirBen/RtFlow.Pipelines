@@ -249,12 +249,6 @@ namespace RtFlow.Pipelines.Tests
                 .Transform(
                     record => 
                     {
-                        // Log that we're filtering this record
-                        if (!record.IsActive) 
-                        {
-                            _output.WriteLine($"Filtering out inactive record ID: {record.Id}");
-                        }
-                        
                         // Return the record only if it's active
                         return record.IsActive ? record : null;
                     },
@@ -267,12 +261,10 @@ namespace RtFlow.Pipelines.Tests
                     {
                         if (record == null)
                         {
-                            _output.WriteLine("Explicitly filtering out a null record");
                             // By returning null again, we ensure this record won't continue
                             return null;
                         }
                         
-                        _output.WriteLine($"Keeping active record ID: {record.Id}");
                         return record;
                     },
                     opts => 
@@ -289,7 +281,6 @@ namespace RtFlow.Pipelines.Tests
                         // Final safety check for null records
                         if (record == null)
                         {
-                            _output.WriteLine("ERROR: Null record reached enrichment stage!");
                             return null; // Return null to be safe
                         }
                         
@@ -321,7 +312,6 @@ namespace RtFlow.Pipelines.Tests
                         // Skip null records
                         if (record == null) 
                         {
-                            _output.WriteLine("WARNING: Null record reached ProcessedRecord transformation!");
                             return null;
                         }
                         
@@ -346,7 +336,6 @@ namespace RtFlow.Pipelines.Tests
                     {
                         if (record == null)
                         {
-                            _output.WriteLine("ERROR: Null record found before batching - this shouldn't happen!");
                             return null;
                         }
                         return record;
