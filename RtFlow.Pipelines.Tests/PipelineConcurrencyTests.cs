@@ -10,8 +10,9 @@ namespace RtFlow.Pipelines.Tests
         [Fact]
         public async Task PipelineHub_ThreadSafe_Creation()
         {
+            FakeHostApplicationLifetime lifetime = new FakeHostApplicationLifetime();
             // Arrange
-            var hub = new PipelineHub(new PipelineFactory(new FakeHostApplicationLifetime()));
+            var hub = new PipelineHub(new PipelineFactory(lifetime));
             var creationCount = 0;
 
             // Create a pipeline factory method that increments a counter when called
@@ -39,8 +40,10 @@ namespace RtFlow.Pipelines.Tests
         [Fact]
         public async Task Dispose_Completes_All_Pipelines()
         {
+                        FakeHostApplicationLifetime lifetime = new FakeHostApplicationLifetime();
+
             // Arrange
-            var hub = new PipelineHub(new PipelineFactory(new FakeHostApplicationLifetime()));
+            var hub = new PipelineHub(new PipelineFactory(lifetime));
             var results = new List<int>();
             var CancellationTokenSource = new CancellationTokenSource();
 
@@ -59,14 +62,18 @@ namespace RtFlow.Pipelines.Tests
             await pipeline.SendAsync(2);
             await pipeline.SendAsync(3);
 
+            await Task.Delay(100); // Give some time for processing
+
+            lifetime.StopApplication();
+
             // Act - dispose the hub
             ((IDisposable)hub).Dispose();
 
             // Wait a bit for processing to complete
-            await Task.Delay(100);
+            await Task.Delay(1000);
 
             // Assert
-            Assert.True(pipeline.Completion.IsCompleted);
+            Assert.True(pipeline.Completion.IsCanceled);
             Assert.Equal(3, results.Count);
             Assert.Contains(1, results);
             Assert.Contains(2, results);

@@ -178,11 +178,10 @@ namespace RtFlow.Pipelines.Tests
         {
             // Arrange
             var lifetime = new FakeHostApplicationLifetime();
-            var factory = new PipelineFactory();
-            using var cts = new CancellationTokenSource();
+            var factory = new PipelineFactory(lifetime);
 
             var pipeline = factory
-                .Create<int>(stopping: lifetime.ApplicationStopping)
+                .Create<int>()
                 .TransformAsync<int>(async (x, ct) =>
                 {
                     await Task.Delay(Timeout.Infinite, ct);
@@ -204,8 +203,7 @@ namespace RtFlow.Pipelines.Tests
         {
             // Arrange
             var lifetime = new FakeHostApplicationLifetime();
-            var factory = new PipelineFactory();
-            using var cts = new CancellationTokenSource();
+            var factory = new PipelineFactory(lifetime);
 
             // Give the head block the same shutdown token
             var headOpts = new ExecutionDataflowBlockOptions
@@ -215,7 +213,7 @@ namespace RtFlow.Pipelines.Tests
             var head = new BufferBlock<string>(headOpts);
 
             var pipeline = factory
-                .BeginWith<string, string>(head, cts.Token)
+                .BeginWith<string, string>(head)
                 .TransformAsync<string>(async (s, ct) =>
                 {
                     await Task.Delay(Timeout.Infinite, ct);
