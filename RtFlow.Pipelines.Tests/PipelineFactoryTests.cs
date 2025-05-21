@@ -136,23 +136,23 @@ namespace RtFlow.Pipelines.Tests
             public double Value { get; set; }
             public DateTime Timestamp { get; set; }
         }
-        
+
         public MetricService(IPipelineHub pipelineHub)
         {
             _pipelineHub = pipelineHub;
-            
+
             // Example of a more complex pipeline with a sink at the end
             _pipelineHub.GetOrCreateSinkPipeline<KeyValuePair<string, double>>(
                 MetricsPipelineName,
                 factory => factory
                     .Create<KeyValuePair<string, double>>()
-                    .Transform(kv => new Metric 
-                    { 
-                        Name = kv.Key, 
-                        Value = kv.Value, 
-                        Timestamp = DateTime.UtcNow 
+                    .Transform(kv => new Metric
+                    {
+                        Name = kv.Key,
+                        Value = kv.Value,
+                        Timestamp = DateTime.UtcNow
                     })
-                    .ToSink(metric => 
+                    .ToSink(metric =>
                     {
                         // In a real app, this would send metrics to a monitoring system
                         Console.WriteLine($"[METRIC] {metric.Name}: {metric.Value}");
@@ -360,55 +360,60 @@ namespace RtFlow.Pipelines.Tests
             var lifetime = new FakeHostApplicationLifetime();
             var factory = new PipelineFactory(lifetime);
             var hub = new PipelineHub(factory);
-            
+
             var numbers = new List<int>();
             var doubleNumbers = new List<double>();
             var uppercaseStrings = new List<string>();
-            
+
             // Create various sink pipelines
             var intSink = hub.CreateSinkPipeline<int>(
-                "IntegerCollector", 
+                "IntegerCollector",
                 n => numbers.Add(n));
-                
+
             var doubleTransformSink = hub.CreateTransformSinkPipeline<int, double>(
                 "DoubleTransformer",
                 n => n * 1.5,
                 d => doubleNumbers.Add(d));
-                
+
             var asyncSink = hub.CreateSinkAsyncPipeline<string>(
                 "AsyncUppercaseCollector",
-                async (s) => 
+                async (s) =>
                 {
                     await Task.Delay(10); // Simulate async work
                     uppercaseStrings.Add(s.ToUpper());
                 });
-            
+
             // Act
             await intSink.SendAsync(42);
             await intSink.SendAsync(100);
-            
+
             await doubleTransformSink.SendAsync(10);
             await doubleTransformSink.SendAsync(20);
-            
+
             await asyncSink.SendAsync("hello");
             await asyncSink.SendAsync("world");
-            
+
             // Complete all pipelines and wait for them to finish
             await hub.CompleteAllAsync();
-            
+
             // Assert
             Assert.Equal(2, numbers.Count);
             Assert.Equal(42, numbers[0]);
             Assert.Equal(100, numbers[1]);
-            
+
             Assert.Equal(2, doubleNumbers.Count);
             Assert.Equal(15.0, doubleNumbers[0]);
             Assert.Equal(30.0, doubleNumbers[1]);
-            
+
             Assert.Equal(2, uppercaseStrings.Count);
             Assert.Equal("HELLO", uppercaseStrings[0]);
             Assert.Equal("WORLD", uppercaseStrings[1]);
-            
+
+            // Check that the tasks completed successfully
+            Assert.True(intSink.Completion.IsCompletedSuccessfully);
+            Assert.True(doubleTransformSink.Completion.IsCompletedSuccessfully);
+            Assert.True(asyncSink.Completion.IsCompletedSuccessfully);
+
             // Verify we get the same sink instance when requesting it again
             var sameSink = hub.GetSinkPipeline<int>("IntegerCollector");
             Assert.Same(intSink, sameSink);
@@ -421,12 +426,12 @@ namespace RtFlow.Pipelines.Tests
             var lifetime = new FakeHostApplicationLifetime();
             var factory = new PipelineFactory(lifetime);
             var hub = new PipelineHub(factory);
-            
+
             // Create services that will share pipelines
             var logService1 = new LogProducerService(hub);
             var logService2 = new LogProducerService(hub);
             var metricService = new MetricService(hub);
-            
+
             // Act - use the services in parallel
             var logTasks = Task.WhenAll(
                 logService1.LogAsync("Service 1: Starting"),
@@ -434,20 +439,28 @@ namespace RtFlow.Pipelines.Tests
                 logService1.LogAsync("Service 1: Processing"),
                 logService2.LogAsync("Service 2: Processing")
             );
-            
+
             var metricTasks = Task.WhenAll(
                 metricService.TrackMetricAsync("CPU", 45.6),
                 metricService.TrackMetricAsync("Memory", 1243.8),
                 metricService.TrackMetricAsync("DiskIO", 32.5)
             );
-            
+
             await Task.WhenAll(logTasks, metricTasks);
-            
+
             // We're not making assertions here since the output is just written to console
             // The test passes if no exceptions are thrown and all messages are processed
-            
+
             // Complete all pipelines gracefully
             await hub.CompleteAllAsync();
+
+            // Assert: Check that the log and metric messages were processed
+            // In a real-world scenario, you would verify the output in a more robust way
+            // For example, you could use a mock or a spy to capture the output
+            // and assert on it. Here we just check that the tasks completed successfully.
+            Assert.True(logTasks.IsCompletedSuccessfully);
+            Assert.True(metricTasks.IsCompletedSuccessfully);
+            // Verify we get the same pipeline instance when requesting it again
         }
     }
 }
