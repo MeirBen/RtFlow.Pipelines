@@ -7,14 +7,14 @@ using Xunit.Abstractions;
 namespace RtFlow.Pipelines.Tests
 {
     /// <summary>
-    /// Tests that verify performance and stability under heavy workloads.
-    /// These tests process millions of records with complex transformations.
+    /// Optimized asynchronous versions of the heavy workload tests.
+    /// These tests use async methods efficiently without unnecessary delays.
     /// </summary>
-    public class HeavyWorkloadTests
+    public class AsyncHeavyWorkloadTests
     {
         private readonly ITestOutputHelper _output;
 
-        public HeavyWorkloadTests(ITestOutputHelper output)
+        public AsyncHeavyWorkloadTests(ITestOutputHelper output)
         {
             _output = output;
         }
@@ -108,7 +108,7 @@ namespace RtFlow.Pipelines.Tests
         #endregion
 
         [Fact]
-        public async Task Process_OneMillionItems_WithComplexTransformations()
+        public async Task Process_OneMillionItems_WithComplexTransformationsAsync()
         {
             // Arrange
             var stopwatch = Stopwatch.StartNew();
@@ -116,48 +116,49 @@ namespace RtFlow.Pipelines.Tests
             const int batchSize = 1000;
             const int progressInterval = 250_000;
 
-            _output.WriteLine($"Starting test with {itemCount:N0} items");
+            _output.WriteLine($"Starting optimized async test with {itemCount:N0} items");
 
-            // Build pipeline for prime factorization
+            // Build pipeline for prime factorization with optimized async methods
+            // Using Task.FromResult instead of async/await with Task.Delay
             var pipeline = FluentPipeline
                 .Create<int>(opts =>
                 {
                     opts.BoundedCapacity = 10000;
                     opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
                 })
-                .Transform(
-                    x => new FactorData
+                .TransformAsync(
+                    x => Task.FromResult(new FactorData
                     {
                         Value = x,
                         Factors = CalculatePrimeFactors(x + 100)
-                    },
+                    }),
                     opts =>
                     {
                         opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
                         opts.BoundedCapacity = 5000;
                     }
                 )
-                .Transform(
-                    item => new FactorStats
+                .TransformAsync(
+                    item => Task.FromResult(new FactorStats
                     {
                         Value = item.Value,
                         Factors = item.Factors,
                         FactorCount = item.Factors.Count,
                         FactorSum = item.Factors.Sum()
-                    }
+                    })
                 )
                 .Batch(
                     batchSize,
                     opts => opts.BoundedCapacity = Math.Max(batchSize, opts.BoundedCapacity)
                 )
-                .Transform(
-                    batch => new BatchResult
+                .TransformAsync(
+                    batch => Task.FromResult(new BatchResult
                     {
                         Count = batch.Length,
                         AverageValue = batch.Average(x => x.Value),
                         AverageFactorCount = batch.Average(x => x.FactorCount),
                         MaxFactorSum = batch.Max(x => x.FactorSum)
-                    }
+                    })
                 )
                 .ToPipeline();
 
@@ -166,7 +167,7 @@ namespace RtFlow.Pipelines.Tests
             var receiverTask = ReceiveResults(pipeline, results, stopwatch, batchSize);
 
             // Act: Send data through the pipeline
-            _output.WriteLine("Sending data...");
+            _output.WriteLine("Sending data to optimized async pipeline...");
             for (int i = 0; i < itemCount; i++)
             {
                 await pipeline.SendAsync(i);
@@ -188,32 +189,8 @@ namespace RtFlow.Pipelines.Tests
             LogPerformanceMetrics(itemCount, stopwatch);
         }
 
-        private async Task ReceiveResults<T>(IPropagatorBlock<int, T> pipeline, List<T> results, Stopwatch stopwatch, int batchSize)
-        {
-            while (await DataflowBlock.OutputAvailableAsync(pipeline))
-            {
-                var result = await DataflowBlock.ReceiveAsync(pipeline);
-                results.Add(result);
-
-                if (results.Count % 10 == 0)
-                {
-                    _output.WriteLine($"Processed {results.Count * batchSize:N0} items in {stopwatch.ElapsedMilliseconds:N0}ms");
-                }
-            }
-        }
-
-        private void LogPerformanceMetrics(int itemCount, Stopwatch stopwatch)
-        {
-            double elapsedMs = stopwatch.ElapsedMilliseconds;
-            double itemsPerSecond = itemCount / (elapsedMs / 1000.0);
-
-            _output.WriteLine($"Processed {itemCount:N0} items in {elapsedMs:N0}ms");
-            _output.WriteLine($"Average processing time per item: {elapsedMs / itemCount:N3}ms");
-            _output.WriteLine($"Throughput: {itemsPerSecond:N0} items/second");
-        }
-
         [Fact]
-        public async Task Complex_ETL_Pipeline_With_Filtering_And_Enrichment()
+        public async Task Complex_ETL_Pipeline_With_Filtering_And_Enrichment_Async()
         {
             // Arrange
             var stopwatch = Stopwatch.StartNew();
@@ -221,7 +198,7 @@ namespace RtFlow.Pipelines.Tests
             const int batchSize = 10_000;
             const int progressInterval = 1_000_000;
 
-            _output.WriteLine($"Starting ETL test with {recordCount:N0} records");
+            _output.WriteLine($"Starting optimized async ETL test with {recordCount:N0} records");
 
             // Reference data for lookups
             var categories = Enumerable.Range(1, 100)
@@ -236,16 +213,16 @@ namespace RtFlow.Pipelines.Tests
                 opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
             });
 
-            // Build ETL pipeline
+            // Build ETL pipeline with optimized async methods
             var pipeline = FluentPipeline
                 .Create<int>(opts =>
                 {
                     opts.BoundedCapacity = 100000;
                     opts.MaxDegreeOfParallelism = Environment.ProcessorCount * 2;
                 })
-                // Generate synthetic records
-                .Transform(
-                    id => new SyntheticRecord
+                // Generate synthetic records efficiently
+                .TransformAsync(
+                    id => Task.FromResult(new SyntheticRecord
                     {
                         Id = id,
                         Timestamp = DateTime.UtcNow.AddSeconds(-id % 86400),
@@ -253,32 +230,33 @@ namespace RtFlow.Pipelines.Tests
                         CategoryId = (id % 100) + 1,
                         RegionId = (id % 10) + 1,
                         IsActive = id % 7 != 0 // Filter condition
-                    },
+                    }),
                     parallelOptions
                 )
-                // Filter inactive records - phase 1: mark inactive as null
-                .Transform(
-                    record => record.IsActive ? record : null,
+                // Filter inactive records efficiently
+                .TransformAsync(
+                    record => Task.FromResult(record.IsActive ? record : null),
                     parallelOptions
                 )
-                // Filter inactive records - phase 2: skip nulls
-                .Transform(
-                    record => record,
+                // Skip nulls efficiently
+                .TransformAsync(
+                    record => Task.FromResult(record),
                     opts =>
                     {
                         opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
                         opts.EnsureOrdered = true;
                     }
                 )
-                // Enrich with lookup data
-                .Transform(
+                // Enrich with lookup data efficiently
+                .TransformAsync(
                     record =>
                     {
-                        if (record == null) return null;
+                        if (record == null) return Task.FromResult<EnrichedRecord>(null);
 
                         try
                         {
-                            return new EnrichedRecord
+                            // Efficient synchronous lookup
+                            return Task.FromResult(new EnrichedRecord
                             {
                                 Id = record.Id,
                                 Timestamp = record.Timestamp,
@@ -286,23 +264,23 @@ namespace RtFlow.Pipelines.Tests
                                 Category = categories[record.CategoryId],
                                 Region = regions[record.RegionId],
                                 ValueGroup = GetValueGroup(record.Value)
-                            };
+                            });
                         }
                         catch (Exception ex)
                         {
                             _output.WriteLine($"Enrichment error: {ex.Message}");
-                            return null;
+                            return Task.FromResult<EnrichedRecord>(null);
                         }
                     },
                     parallelOptions
                 )
-                // Add computed fields
-                .Transform(
+                // Add computed fields efficiently
+                .TransformAsync(
                     record =>
                     {
-                        if (record == null) return null;
-
-                        return new ProcessedRecord
+                        if (record == null) return Task.FromResult<ProcessedRecord>(null);
+                        
+                        return Task.FromResult(new ProcessedRecord
                         {
                             Id = record.Id,
                             Timestamp = record.Timestamp,
@@ -313,22 +291,25 @@ namespace RtFlow.Pipelines.Tests
                             Hour = record.Timestamp.Hour,
                             DayOfWeek = record.Timestamp.DayOfWeek,
                             NormalizedValue = NormalizeValue(record.Value)
-                        };
+                        });
                     },
                     parallelOptions
                 )
-                // Last null check
-                .Transform(record => record, parallelOptions)
+                // Last null check efficiently
+                .TransformAsync(
+                    record => Task.FromResult(record), 
+                    parallelOptions
+                )
                 // Batch for aggregation
                 .Batch(
                     batchSize,
                     opts => opts.BoundedCapacity = Math.Max(batchSize, opts.BoundedCapacity)
                 )
-                // Aggregate batches
-                .Transform(
+                // Aggregate batches efficiently
+                .TransformAsync(
                     batch =>
                     {
-                        // Filter nulls
+                        // Filter nulls efficiently (synchronously)
                         var validRecords = batch.Where(r => r != null).ToArray();
 
                         if (validRecords.Length < batch.Length)
@@ -339,11 +320,11 @@ namespace RtFlow.Pipelines.Tests
                         if (validRecords.Length == 0)
                         {
                             _output.WriteLine("ERROR: Empty batch after filtering");
-                            return null;
+                            return Task.FromResult<BatchSummary>(null);
                         }
 
-                        // Create summary with grouped data
-                        return new BatchSummary
+                        // Create summary with grouped data efficiently
+                        return Task.FromResult(new BatchSummary
                         {
                             BatchSize = validRecords.Length,
                             AverageValue = validRecords.Average(r => r.Value),
@@ -370,13 +351,13 @@ namespace RtFlow.Pipelines.Tests
                                     Count = g.Count()
                                 })
                                 .ToList()
-                        };
+                        });
                     },
                     parallelOptions
                 )
                 .ToPipeline();
 
-            // Process results
+            // Process results asynchronously
             var processedBatches = new List<BatchSummary>();
             var receiverTask = Task.Run(async () =>
             {
@@ -408,7 +389,7 @@ namespace RtFlow.Pipelines.Tests
             });
 
             // Act: Send data
-            _output.WriteLine("Sending record IDs...");
+            _output.WriteLine("Sending record IDs to optimized async pipeline...");
             for (int i = 0; i < recordCount; i++)
             {
                 await pipeline.SendAsync(i);
@@ -443,6 +424,32 @@ namespace RtFlow.Pipelines.Tests
             LogSampleBatches(processedBatches);
         }
 
+        #region Helper Methods
+
+        private async Task ReceiveResults<T>(IPropagatorBlock<int, T> pipeline, List<T> results, Stopwatch stopwatch, int batchSize)
+        {
+            while (await DataflowBlock.OutputAvailableAsync(pipeline))
+            {
+                var result = await DataflowBlock.ReceiveAsync(pipeline);
+                results.Add(result);
+
+                if (results.Count % 10 == 0)
+                {
+                    _output.WriteLine($"Processed {results.Count * batchSize:N0} items in {stopwatch.ElapsedMilliseconds:N0}ms");
+                }
+            }
+        }
+
+        private void LogPerformanceMetrics(int itemCount, Stopwatch stopwatch)
+        {
+            double elapsedMs = stopwatch.ElapsedMilliseconds;
+            double itemsPerSecond = itemCount / (elapsedMs / 1000.0);
+
+            _output.WriteLine($"Processed {itemCount:N0} items in {elapsedMs:N0}ms");
+            _output.WriteLine($"Average processing time per item: {elapsedMs / itemCount:N3}ms");
+            _output.WriteLine($"Throughput: {itemsPerSecond:N0} items/second");
+        }
+
         private void LogSampleBatches(List<BatchSummary> processedBatches)
         {
             for (int i = 0; i < Math.Min(3, processedBatches.Count); i++)
@@ -453,8 +460,6 @@ namespace RtFlow.Pipelines.Tests
                 _output.WriteLine($"  Regions: {string.Join(", ", batch.RegionSummary.Take(3).Select(r => $"{r.Region}:{r.Count}"))}...");
             }
         }
-
-        #region Helper Methods
 
         /// <summary>
         /// Finds all prime factors of a given number.
