@@ -11,15 +11,9 @@ public static class FluentPipeline
     /// <summary>
     /// Start a pipeline with a BufferBlock as the entry point.
     /// </summary>
-    /// <typeparam name="T">The type of data that flows through the initial buffer</typeparam>
-    /// <param name="configureBuffer">Optional action to configure the buffer block options</param>
+    /// <typeparam name="T">The type of data that flows through the initial buffer</typeparam>    /// <param name="configureBuffer">Optional action to configure the buffer block options</param>
     /// <param name="cancellationToken">Optional cancellation token to control pipeline lifetime</param>
-    /// <returns>A fluent pipeline builder where input and output types are initially the same</returns>
-    /// <remarks>
-    /// The type parameters are initially the same (T,T) because the starting BufferBlock
-    /// both accepts and emits the same type. Subsequent transformation operations can change
-    /// the output type of the pipeline while preserving type safety through the fluent API.
-    /// </remarks>
+    /// <returns>A fluent pipeline builder that can be used to continue building the pipeline</returns>
     public static IFluentPipelineBuilder<T, T> Create<T>(
         Action<ExecutionDataflowBlockOptions> configureBuffer = null,
         CancellationToken cancellationToken = default)
