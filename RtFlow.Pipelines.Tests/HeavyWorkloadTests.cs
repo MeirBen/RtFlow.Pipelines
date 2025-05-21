@@ -19,7 +19,9 @@ namespace RtFlow.Pipelines.Tests
             _output = output;
         }
 
-        // Define record types for the test
+        #region Test Data Models
+        
+        // Models for the ETL pipeline test
         public class SyntheticRecord
         {
             public int Id { get; set; }
@@ -82,7 +84,7 @@ namespace RtFlow.Pipelines.Tests
             public int Count { get; set; }
         }
 
-        // Define more record types for the prime factors test
+        // Models for the prime factors test
         public class FactorData
         {
             public int Value { get; set; }
@@ -102,34 +104,37 @@ namespace RtFlow.Pipelines.Tests
             public double AverageFactorCount { get; set; }
             public int MaxFactorSum { get; set; }
         }
+        
+        #endregion
 
         [Fact]
         public async Task Process_OneMillionItems_WithComplexTransformations()
         {
-            // Arrange: Set up a pipeline with multiple complex transformations
+            // Arrange
             var stopwatch = Stopwatch.StartNew();
-            const int itemCount = 1_000_000; // Reduced for faster testing
+            const int itemCount = 1_000_000;
+            const int batchSize = 1000;
+            const int progressInterval = 250_000;
             
             _output.WriteLine($"Starting test with {itemCount:N0} items");
             
+            // Build pipeline for prime factorization
             var pipeline = FluentPipeline
                 .Create<int>(opts => 
                 {
                     opts.BoundedCapacity = 10000;
                     opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
                 })
-                // Calculate prime factors (CPU-intensive operation)
                 .Transform(
                     x => new FactorData { 
                         Value = x, 
-                        Factors = CalculatePrimeFactors(x + 100) // Add 100 to avoid too many small numbers
+                        Factors = CalculatePrimeFactors(x + 100) 
                     },
                     opts => { 
                         opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
                         opts.BoundedCapacity = 5000;
                     }
                 )
-                // Group items by factor count
                 .Transform(
                     item => new FactorStats { 
                         Value = item.Value, 
@@ -138,15 +143,10 @@ namespace RtFlow.Pipelines.Tests
                         FactorSum = item.Factors.Sum()
                     }
                 )
-                // Batch by 1000 for bulk processing
                 .Batch(
-                    1000,
-                    opts => {
-                        // Make sure the BoundedCapacity is at least 1000 (the batch size)
-                        opts.BoundedCapacity = Math.Max(1000, opts.BoundedCapacity);
-                    }
+                    batchSize,
+                    opts => opts.BoundedCapacity = Math.Max(batchSize, opts.BoundedCapacity)
                 )
-                // Process each batch
                 .Transform(
                     batch => new BatchResult {
                         Count = batch.Length,
@@ -157,137 +157,121 @@ namespace RtFlow.Pipelines.Tests
                 )
                 .ToPipeline();
 
-            // Set up a receiver to collect batched results
+            // Set up result collection
             var results = new List<BatchResult>();
-            var receiverTask = Task.Run(async () =>
-            {
-                while (await DataflowBlock.OutputAvailableAsync(pipeline))
-                {
-                    var result = await DataflowBlock.ReceiveAsync(pipeline);
-                    results.Add(result);
-                    
-                    if (results.Count % 10 == 0)
-                    {
-                        _output.WriteLine($"Processed {results.Count * 1000:N0} items in {stopwatch.ElapsedMilliseconds:N0}ms");
-                    }
-                }
-            });
+            var receiverTask = ReceiveResults(pipeline, results, stopwatch, batchSize);
 
-            // Act: Send a million integers through the pipeline
+            // Act: Send data through the pipeline
             _output.WriteLine("Sending data...");
             for (int i = 0; i < itemCount; i++)
             {
                 await pipeline.SendAsync(i);
                 
-                // Occasionally report progress during sending
-                if (i > 0 && i % 250_000 == 0)
+                if (i > 0 && i % progressInterval == 0)
                 {
                     _output.WriteLine($"Sent {i:N0} items in {stopwatch.ElapsedMilliseconds:N0}ms");
                 }
             }
             
             // Complete the pipeline and wait for all processing to finish
-            _output.WriteLine("Completing pipeline...");
             pipeline.Complete();
             await Task.WhenAll(receiverTask, pipeline.Completion);
             
             stopwatch.Stop();
             
             // Assert
-            Assert.Equal(itemCount / 1000, results.Count); // Should have itemCount/1000 batches
-            _output.WriteLine($"Processed {itemCount:N0} items in {stopwatch.ElapsedMilliseconds:N0}ms");
-            _output.WriteLine($"Average processing time per item: {stopwatch.ElapsedMilliseconds / (double)itemCount:N3}ms");
-            _output.WriteLine($"Throughput: {itemCount / (stopwatch.ElapsedMilliseconds / 1000.0):N0} items/second");
+            Assert.Equal(itemCount / batchSize, results.Count); 
+            LogPerformanceMetrics(itemCount, stopwatch);
         }
-
+        
+        private async Task ReceiveResults<T>(IPropagatorBlock<int, T> pipeline, List<T> results, Stopwatch stopwatch, int batchSize)
+        {
+            while (await DataflowBlock.OutputAvailableAsync(pipeline))
+            {
+                var result = await DataflowBlock.ReceiveAsync(pipeline);
+                results.Add(result);
+                
+                if (results.Count % 10 == 0)
+                {
+                    _output.WriteLine($"Processed {results.Count * batchSize:N0} items in {stopwatch.ElapsedMilliseconds:N0}ms");
+                }
+            }
+        }
+        
+        private void LogPerformanceMetrics(int itemCount, Stopwatch stopwatch)
+        {
+            double elapsedMs = stopwatch.ElapsedMilliseconds;
+            double itemsPerSecond = itemCount / (elapsedMs / 1000.0);
+            
+            _output.WriteLine($"Processed {itemCount:N0} items in {elapsedMs:N0}ms");
+            _output.WriteLine($"Average processing time per item: {elapsedMs / itemCount:N3}ms");
+            _output.WriteLine($"Throughput: {itemsPerSecond:N0} items/second");
+        }
+        
         [Fact]
         public async Task Complex_ETL_Pipeline_With_Filtering_And_Enrichment()
         {
-            // Arrange: Setup a complex ETL pipeline that mimics real-world data processing
+            // Arrange
             var stopwatch = Stopwatch.StartNew();
-            const int recordCount = 1_000_000; // Using a smaller dataset for faster testing
+            const int recordCount = 1_000_000;
+            const int batchSize = 10_000;
+            const int progressInterval = 1_000_000;
             
             _output.WriteLine($"Starting ETL test with {recordCount:N0} records");
             
-            // Create some reference data for lookups
+            // Reference data for lookups
             var categories = Enumerable.Range(1, 100)
-                .ToDictionary(
-                    k => k, 
-                    v => $"Category-{v}"
-                );
+                .ToDictionary(k => k, v => $"Category-{v}");
                 
             var regions = Enumerable.Range(1, 10)
-                .ToDictionary(
-                    k => k, 
-                    v => $"Region-{v}"
-                );
+                .ToDictionary(k => k, v => $"Region-{v}");
             
-            // Create the pipeline that simulates an ETL process
+            // Set up common options
+            var parallelOptions = new Action<ExecutionDataflowBlockOptions>(opts => 
+            {
+                opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
+            });
+            
+            // Build ETL pipeline
             var pipeline = FluentPipeline
                 .Create<int>(opts => 
                 { 
                     opts.BoundedCapacity = 100000;
                     opts.MaxDegreeOfParallelism = Environment.ProcessorCount * 2;
                 })
-                // Generate synthetic records from input numbers
+                // Generate synthetic records
                 .Transform(
                     id => new SyntheticRecord {
                         Id = id,
-                        Timestamp = DateTime.UtcNow.AddSeconds(-id % 86400), // Spread over a day
-                        Value = Math.Sin(id * 0.1) * 1000, // Generate a sine wave value
+                        Timestamp = DateTime.UtcNow.AddSeconds(-id % 86400), 
+                        Value = Math.Sin(id * 0.1) * 1000,
                         CategoryId = (id % 100) + 1,
                         RegionId = (id % 10) + 1,
                         IsActive = id % 7 != 0 // Filter condition
                     },
-                    opts => { opts.MaxDegreeOfParallelism = Environment.ProcessorCount; }
+                    parallelOptions
                 )
-                // Here we implement a proper null filter technique for TPL Dataflow
-                // First, setup a condition block to decide where items should go
-                // IMPORTANT: When filtering in TPL Dataflow, returning null doesn't automatically
-                // filter out the item - it just sets the item value to null, which continues through the pipeline.
-                // This was causing NullReferenceException in the pipeline.
+                // Filter inactive records - phase 1: mark inactive as null
                 .Transform(
-                    record => 
-                    {
-                        // Return the record only if it's active
-                        return record.IsActive ? record : null;
-                    },
-                    opts => { opts.MaxDegreeOfParallelism = Environment.ProcessorCount; }
+                    record => record.IsActive ? record : null,
+                    parallelOptions
                 )
-                // Explicitly create a filter that ONLY allows non-null records through
-                // This is a critical step in dealing with nulls in TPL Dataflow
+                // Filter inactive records - phase 2: skip nulls
                 .Transform(
-                    record => 
-                    {
-                        if (record == null)
-                        {
-                            // By returning null again, we ensure this record won't continue
-                            return null;
-                        }
-                        
-                        return record;
-                    },
+                    record => record,
                     opts => 
                     { 
                         opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
-                        // For safety, let's not post any nulls
                         opts.EnsureOrdered = true; 
                     }
                 )
-                // Enrich with lookup data (simulating SQL JOIN)
+                // Enrich with lookup data
                 .Transform(
-                    record => 
-                    {
-                        // Final safety check for null records
-                        if (record == null)
-                        {
-                            return null; // Return null to be safe
-                        }
+                    record => {
+                        if (record == null) return null;
                         
-                        try
-                        {
-                            return new EnrichedRecord 
-                            {
+                        try {
+                            return new EnrichedRecord {
                                 Id = record.Id,
                                 Timestamp = record.Timestamp,
                                 Value = record.Value,
@@ -296,27 +280,19 @@ namespace RtFlow.Pipelines.Tests
                                 ValueGroup = GetValueGroup(record.Value)
                             };
                         }
-                        catch (Exception ex)
-                        {
-                            // Log any exceptions during enrichment
-                            _output.WriteLine($"Exception during enrichment: {ex.Message}");
-                            return null; // Return null for error cases
+                        catch (Exception ex) {
+                            _output.WriteLine($"Enrichment error: {ex.Message}");
+                            return null;
                         }
                     },
-                    opts => { opts.MaxDegreeOfParallelism = Environment.ProcessorCount; }
+                    parallelOptions
                 )
                 // Add computed fields
                 .Transform(
-                    record => 
-                    {
-                        // Skip null records
-                        if (record == null) 
-                        {
-                            return null;
-                        }
+                    record => {
+                        if (record == null) return null;
                         
-                        return new ProcessedRecord 
-                        {
+                        return new ProcessedRecord {
                             Id = record.Id,
                             Timestamp = record.Timestamp,
                             Value = record.Value,
@@ -328,206 +304,148 @@ namespace RtFlow.Pipelines.Tests
                             NormalizedValue = NormalizeValue(record.Value)
                         };
                     },
-                    opts => { opts.MaxDegreeOfParallelism = Environment.ProcessorCount; }
+                    parallelOptions
                 )
-                // One final null check before batching
-                .Transform(
-                    record => 
-                    {
-                        if (record == null)
-                        {
-                            return null;
-                        }
-                        return record;
-                    },
-                    opts => { opts.MaxDegreeOfParallelism = Environment.ProcessorCount; }
-                )
-                // Group into batches of 10,000 for bulk operations
+                // Last null check
+                .Transform(record => record, parallelOptions)
+                // Batch for aggregation
                 .Batch(
-                    10000,
-                    opts => { 
-                        // Make sure the BoundedCapacity is at least 10000 (the batch size)
-                        opts.BoundedCapacity = Math.Max(10000, opts.BoundedCapacity);
-                    }
+                    batchSize,
+                    opts => opts.BoundedCapacity = Math.Max(batchSize, opts.BoundedCapacity)
                 )
-                // Aggregate the batches (simulating GROUP BY in SQL)
+                // Aggregate batches
                 .Transform(
-                    batch => 
-                    {
-                        // Filter out any nulls that might have reached the batch
+                    batch => {
+                        // Filter nulls
                         var validRecords = batch.Where(r => r != null).ToArray();
                         
-                        // Log if we had to filter out any nulls
-                        if (validRecords.Length < batch.Length)
-                        {
-                            _output.WriteLine($"WARNING: Filtered {batch.Length - validRecords.Length} null records from batch");
+                        if (validRecords.Length < batch.Length) {
+                            _output.WriteLine($"WARNING: Removed {batch.Length - validRecords.Length} null records from batch");
                         }
                         
-                        // If we have no valid records after filtering, skip this batch
-                        if (validRecords.Length == 0)
-                        {
-                            _output.WriteLine("ERROR: Empty batch after null filtering!");
+                        if (validRecords.Length == 0) {
+                            _output.WriteLine("ERROR: Empty batch after filtering");
                             return null;
                         }
                         
-                        return new BatchSummary 
-                        {
+                        // Create summary with grouped data
+                        return new BatchSummary {
                             BatchSize = validRecords.Length,
                             AverageValue = validRecords.Average(r => r.Value),
                             ValueGroups = validRecords.GroupBy(r => r.ValueGroup)
-                                .Select(g => new ValueGroupSummary 
-                                { 
+                                .Select(g => new ValueGroupSummary { 
                                     Group = g.Key, 
                                     Count = g.Count(),
                                     Average = g.Average(r => r.NormalizedValue)
                                 })
                                 .ToList(),
                             RegionSummary = validRecords.GroupBy(r => r.Region)
-                                .Select(g => new RegionSummary 
-                                { 
+                                .Select(g => new RegionSummary { 
                                     Region = g.Key, 
                                     Count = g.Count(),
                                     Average = g.Average(r => r.Value)
                                 })
                                 .ToList(),
                             HourlyDistribution = validRecords.GroupBy(r => r.Hour)
-                                .Select(g => new HourlyDistribution { Hour = g.Key, Count = g.Count() })
+                                .Select(g => new HourlyDistribution { 
+                                    Hour = g.Key, 
+                                    Count = g.Count() 
+                                })
                                 .ToList()
                         };
                     },
-                    opts => { opts.MaxDegreeOfParallelism = Environment.ProcessorCount; }
+                    parallelOptions
                 )
                 .ToPipeline();
 
-            // Collector for the processed batch results
+            // Process results
             var processedBatches = new List<BatchSummary>();
-            
-            try
-            {
-                // Start a task to receive the processed batches
-                var receiverTask = Task.Run(async () =>
-                {
-                    try 
-                    {
-                        while (await DataflowBlock.OutputAvailableAsync(pipeline))
-                        {
-                            try
-                            {
-                                var batch = await DataflowBlock.ReceiveAsync(pipeline);
-                                
-                                // Skip null batches
-                                if (batch == null)
-                                {
-                                    _output.WriteLine("WARNING: Received null batch, skipping");
-                                    continue;
-                                }
-                                
-                                processedBatches.Add(batch);
-                                
-                                if (processedBatches.Count % 10 == 0)
-                                {
-                                    _output.WriteLine($"Processed {processedBatches.Count * 10000:N0} records in {stopwatch.ElapsedMilliseconds:N0}ms");
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                _output.WriteLine($"Exception in receiver loop: {ex}");
-                                throw;
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _output.WriteLine($"Exception in receiver task: {ex}");
-                        throw;
-                    }
-                });                // Act: Send record IDs through the pipeline
-                _output.WriteLine("Sending record IDs...");
-                for (int i = 0; i < recordCount; i++)
-                {
-                    try 
-                    {
-                        await pipeline.SendAsync(i);
+            var receiverTask = Task.Run(async () => {
+                try {
+                    while (await DataflowBlock.OutputAvailableAsync(pipeline)) {
+                        var batch = await DataflowBlock.ReceiveAsync(pipeline);
                         
-                        // Report progress occasionally
-                        if (i > 0 && i % 1_000_000 == 0)
-                        {
-                            _output.WriteLine($"Sent {i:N0} record IDs in {stopwatch.ElapsedMilliseconds:N0}ms");
+                        if (batch == null) {
+                            _output.WriteLine("WARNING: Skipping null batch");
+                            continue;
+                        }
+                        
+                        processedBatches.Add(batch);
+                        
+                        if (processedBatches.Count % 10 == 0) {
+                            _output.WriteLine($"Processed {processedBatches.Count * batchSize:N0} records in {stopwatch.ElapsedMilliseconds:N0}ms");
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        _output.WriteLine($"Exception sending item {i}: {ex}");
-                        throw;
-                    }
                 }
-                
-                // Signal completion and wait for all processing to finish
-                _output.WriteLine("Completing pipeline...");
-                pipeline.Complete();
-                
-                try
-                {
-                    await Task.WhenAll(receiverTask, pipeline.Completion);
-                }
-                catch (Exception ex)
-                {
-                    _output.WriteLine($"Exception during pipeline completion: {ex}");
+                catch (Exception ex) {
+                    _output.WriteLine($"Receiver error: {ex.Message}");
                     throw;
                 }
+            });
+
+            // Act: Send data
+            _output.WriteLine("Sending record IDs...");
+            for (int i = 0; i < recordCount; i++) {
+                await pipeline.SendAsync(i);
                 
-                stopwatch.Stop();
-                
-                // Filter out inactive records (1/7 of all records)
-                var expectedActiveRecords = recordCount - (recordCount / 7); 
-                
-                // Assert - be more lenient with the check
-                // We're expecting about this many batches, but allow some flexibility
-                _output.WriteLine($"Expected approx {expectedActiveRecords / 10000} batches, got {processedBatches.Count}");
-                Assert.True(
-                    processedBatches.Count >= 0,
-                    $"Expected at least some batches, but got {processedBatches.Count}"
-                );
-                
-                // Output statistics
-                _output.WriteLine($"Processed {expectedActiveRecords:N0} active records in {stopwatch.ElapsedMilliseconds:N0}ms");
-                _output.WriteLine($"Throughput: {expectedActiveRecords / (stopwatch.ElapsedMilliseconds / 1000.0):N0} records/second");
-                _output.WriteLine($"Batch count: {processedBatches.Count}");
-                
-                // Output some aggregate data from the first few batches
-                for (int i = 0; i < Math.Min(3, processedBatches.Count); i++)
-                {
-                    var batch = processedBatches[i];
-                    _output.WriteLine($"Batch {i}: Size={batch.BatchSize}, AvgValue={batch.AverageValue:F2}");
-                    _output.WriteLine($"  Value Groups: {string.Join(", ", batch.ValueGroups.Take(3).Select(g => $"{g.Group}:{g.Count}"))}...");
-                    _output.WriteLine($"  Regions: {string.Join(", ", batch.RegionSummary.Take(3).Select(r => $"{r.Region}:{r.Count}"))}...");
+                if (i > 0 && i % progressInterval == 0) {
+                    _output.WriteLine($"Sent {i:N0} record IDs in {stopwatch.ElapsedMilliseconds:N0}ms");
                 }
             }
-            catch (Exception ex)
+            
+            // Complete pipeline
+            pipeline.Complete();
+            await Task.WhenAll(receiverTask, pipeline.Completion);
+            stopwatch.Stop();
+            
+            // Calculate expected results
+            var expectedActiveRecords = recordCount - (recordCount / 7);
+            var expectedBatches = (int)Math.Ceiling(expectedActiveRecords / (double)batchSize);
+            
+            // Assert
+            _output.WriteLine($"Expected ~{expectedBatches} batches, got {processedBatches.Count}");
+            Assert.True(
+                processedBatches.Count > 0,
+                $"Expected at least some batches, but got {processedBatches.Count}"
+            );
+            
+            // Log performance metrics
+            LogPerformanceMetrics(expectedActiveRecords, stopwatch);
+            _output.WriteLine($"Batch count: {processedBatches.Count}");
+            
+            // Log sample batches
+            LogSampleBatches(processedBatches);
+        }
+        
+        private void LogSampleBatches(List<BatchSummary> processedBatches)
+        {
+            for (int i = 0; i < Math.Min(3, processedBatches.Count); i++)
             {
-                _output.WriteLine($"Unhandled exception in test: {ex}");
-                throw;
+                var batch = processedBatches[i];
+                _output.WriteLine($"Batch {i}: Size={batch.BatchSize}, AvgValue={batch.AverageValue:F2}");
+                _output.WriteLine($"  Value Groups: {string.Join(", ", batch.ValueGroups.Take(3).Select(g => $"{g.Group}:{g.Count}"))}...");
+                _output.WriteLine($"  Regions: {string.Join(", ", batch.RegionSummary.Take(3).Select(r => $"{r.Region}:{r.Count}"))}...");
             }
         }
-
-        // Helper methods for the tests
         
+        #region Helper Methods
+        
+        /// <summary>
+        /// Finds all prime factors of a given number.
+        /// </summary>
         private static List<int> CalculatePrimeFactors(int number)
         {
             var factors = new List<int>();
-            
-            // Handle edge cases
-            if (number <= 1)
-                return factors;
+            if (number <= 1) return factors;
                 
-            // Check for divisibility by 2
+            // Check divisibility by 2
             while (number % 2 == 0)
             {
                 factors.Add(2);
                 number /= 2;
             }
             
-            // Check for divisibility by odd numbers
+            // Check divisibility by odd numbers starting at 3
             for (int i = 3; i <= Math.Sqrt(number); i += 2)
             {
                 while (number % i == 0)
@@ -538,25 +456,27 @@ namespace RtFlow.Pipelines.Tests
             }
             
             // If number is a prime greater than 2
-            if (number > 2)
-                factors.Add(number);
+            if (number > 2) factors.Add(number);
                 
             return factors;
         }
         
-        private static string GetValueGroup(double value)
+        /// <summary>
+        /// Categorizes a value into a group based on its magnitude.
+        /// </summary>
+        private static string GetValueGroup(double value) => value switch
         {
-            if (value < -500) return "Very Low";
-            if (value < 0) return "Low";
-            if (value < 500) return "Medium";
-            return "High";
-        }
+            < -500 => "Very Low",
+            < 0 => "Low",
+            < 500 => "Medium",
+            _ => "High"
+        };
         
-        private static double NormalizeValue(double value)
-        {
-            // Simple min-max normalization to 0-1 range
-            // Assuming values are in the -1000 to 1000 range from the sine function
-            return (value + 1000) / 2000;
-        }
+        /// <summary>
+        /// Normalizes a value from [-1000, 1000] range to [0, 1] range.
+        /// </summary>
+        private static double NormalizeValue(double value) => (value + 1000) / 2000;
+        
+        #endregion
     }
 }
