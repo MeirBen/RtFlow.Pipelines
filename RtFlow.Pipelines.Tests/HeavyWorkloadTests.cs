@@ -217,7 +217,7 @@ namespace RtFlow.Pipelines.Tests
         {
             // Arrange
             var stopwatch = Stopwatch.StartNew();
-            const int recordCount = 1_000_000;
+            const int recordCount = 15_000_000;
             const int batchSize = 10_000;
             const int progressInterval = 1_000_000;
 
