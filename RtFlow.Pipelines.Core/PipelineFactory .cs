@@ -1,21 +1,19 @@
 using System.Threading.Tasks.Dataflow;
-using Microsoft.Extensions.Hosting;
 
 namespace RtFlow.Pipelines.Core;
 
 public class PipelineFactory : IPipelineFactory
 {
-    private readonly CancellationToken _stopping;
-    public PipelineFactory(IHostApplicationLifetime lifetime)
-        => _stopping = lifetime.ApplicationStopping;
 
-    public IFluentPipelineBuilder<T, T> Create<T>(Action<ExecutionDataflowBlockOptions> cfg = null)
+    public IFluentPipelineBuilder<T, T> Create<T>
+    (Action<ExecutionDataflowBlockOptions> cfg = null,
+        CancellationToken stopping = default)
         // specify <T> here
-        => FluentPipeline.Create<T>(cfg, _stopping);
+        => FluentPipeline.Create<T>(cfg, stopping);
 
     public IFluentPipelineBuilder<TIn, TOut> BeginWith<TIn, TOut>(
         IPropagatorBlock<TIn, TOut> head,
-        Action<ExecutionDataflowBlockOptions> cfg = null)
+        CancellationToken stopping = default)
         // and here <TIn, TOut>
-        => FluentPipeline.BeginWith(head, _stopping);
+        => FluentPipeline.BeginWith(head, stopping);
 }

@@ -8,6 +8,13 @@ namespace RtFlow.Pipelines.Core;
 public interface IPipelineHub
 {
     /// <summary>
+    /// Checks whether a pipeline with the specified name exists
+    /// </summary>
+    /// <param name="pipelineName">The name of the pipeline to check</param>
+    /// <returns>True if the pipeline exists, false otherwise</returns>
+    bool PipelineExists(string pipelineName);
+    
+    /// <summary>
     /// Gets or creates a pipeline with the specified name and types
     /// </summary>
     /// <typeparam name="TIn">The input type of the pipeline</typeparam>
@@ -46,6 +53,13 @@ public interface IPipelineHub
     ITargetBlock<T> GetOrCreateSinkPipeline<T>(
         string pipelineName,
         Func<IPipelineFactory, ITargetBlock<T>> createSinkPipeline);
+        
+    /// <summary>
+    /// Removes a pipeline from the hub
+    /// </summary>
+    /// <param name="pipelineName">The name of the pipeline to remove</param>
+    /// <returns>True if the pipeline was removed, false if it wasn't found</returns>
+    bool RemovePipeline(string pipelineName);
     
     /// <summary>
     /// Completes all pipelines when application is shutting down
