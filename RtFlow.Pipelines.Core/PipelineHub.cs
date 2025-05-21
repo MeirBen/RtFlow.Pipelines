@@ -313,55 +313,17 @@ public class PipelineHub : IPipelineHub, IDisposable
 
             _isDisposed = true;
 
-            try
+            // Complete all pipelines
+            foreach (var pipeline in _pipelines.Values)
             {
-                // First empty all pipelines before completing them
-                foreach (var pipeline in _pipelines.Values)
+                if (pipeline is IDataflowBlock dataflowBlock && !dataflowBlock.Completion.IsCompleted)
                 {
-                    // Try to empty the pipeline to avoid hanging on completion
-                    TryEmptyPipeline(pipeline);
+                    dataflowBlock.Complete();
                 }
-
-                // Now complete all pipelines
-                foreach (var pipeline in _pipelines.Values)
-                {
-                    if (pipeline is IDataflowBlock dataflowBlock && !dataflowBlock.Completion.IsCompleted)
-                    {
-                        dataflowBlock.Complete();
-                    }
-                }
-
-                // Wait for completion with a timeout to avoid hanging
-                foreach (var pipeline in _pipelines.Values)
-                {
-                    if (pipeline is IDataflowBlock dataflowBlock && !dataflowBlock.Completion.IsCompleted)
-                    {
-                        try
-                        {
-                            // Use a reasonable timeout to avoid hanging indefinitely
-                            bool completed = dataflowBlock.Completion.Wait(TimeSpan.FromSeconds(5));
-                            if (!completed)
-                            {
-                                // If we timeout, log or record this (but continue with disposal)
-                                System.Diagnostics.Debug.WriteLine($"Timeout waiting for pipeline completion during disposal");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            // Log the exception but continue with disposal
-                            System.Diagnostics.Debug.WriteLine($"Error waiting for pipeline completion: {ex.Message}");
-                        }
-                    }
-                }
-
-                _pipelines.Clear();
-                _pipelineDefinitions.Clear();
             }
-            catch (Exception ex)
-            {
-                // Log any exceptions during disposal but don't fail
-                System.Diagnostics.Debug.WriteLine($"Exception during PipelineHub disposal: {ex}");
-            }
+
+            _pipelines.Clear();
+            _pipelineDefinitions.Clear();
         }
 
         GC.SuppressFinalize(this);
@@ -402,98 +364,6 @@ public class PipelineHub : IPipelineHub, IDisposable
             PipelineFaulted?.Invoke(this, new PipelineFaultedEventArgs(
                 pipelineName,
                 ex));
-        }
-    }
-    
-    /// <summary>
-    /// Attempts to empty a pipeline of any pending messages by draining all source blocks
-    /// </summary>
-    private void TryEmptyPipeline(object pipeline)
-    {
-        try
-        {
-            // First try to handle ISourceBlock<T> directly - this is the most common case
-            if (pipeline is IDataflowBlock dataflowBlock)
-            {
-                // Extract all blocks from the pipeline using reflection (if they're accessible)
-                var blocks = new List<IDataflowBlock> { dataflowBlock };
-                
-                // Try to access _blocks member using reflection if this is a composite block
-                var blockType = pipeline.GetType();
-                var blockFields = blockType.GetFields(System.Reflection.BindingFlags.Instance | 
-                                                     System.Reflection.BindingFlags.NonPublic);
-                
-                foreach (var field in blockFields)
-                {
-                    if (field.FieldType == typeof(List<IDataflowBlock>) || 
-                        field.FieldType == typeof(IEnumerable<IDataflowBlock>) ||
-                        field.FieldType == typeof(IList<IDataflowBlock>))
-                    {
-                        var fieldValue = field.GetValue(pipeline);
-                        if (fieldValue is IEnumerable<IDataflowBlock> fieldBlocks)
-                        {
-                            blocks.AddRange(fieldBlocks);
-                        }
-                    }
-                }
-                
-                // Try to empty each block
-                foreach (var block in blocks)
-                {
-                    // For generic source blocks, use TryReceive in a loop
-                    Type blockInterfaceType = null;
-                    
-                    foreach (var iface in block.GetType().GetInterfaces())
-                    {
-                        if (iface.IsGenericType && iface.GetGenericTypeDefinition() == typeof(ISourceBlock<>))
-                        {
-                            blockInterfaceType = iface;
-                            break;
-                        }
-                    }
-                    
-                    if (blockInterfaceType != null)
-                    {
-                        var genericArgType = blockInterfaceType.GetGenericArguments()[0];
-                        
-                        // Get the appropriate TryReceive method
-                        var tryReceiveMethod = blockInterfaceType.GetMethod("TryReceive");
-                        
-                        if (tryReceiveMethod != null)
-                        {
-                                // We need to drain the block completely
-                            bool hasMoreItems;
-                            do
-                            {
-                                // Create parameters array with the output parameter 
-                                var parameters = new object[] { null, null };
-                                
-                                // Use reflection to invoke TryReceive with null predicate
-                                // The second parameter is an 'out' parameter, which is filled by the method
-                                hasMoreItems = (bool)tryReceiveMethod.Invoke(block, parameters);
-                            } while (hasMoreItems);
-                        }
-                    }
-                    
-                    // For blocks with a TryReceiveAll method
-                    var directTryReceiveAllMethod = block.GetType().GetMethod("TryReceiveAll");
-                    if (directTryReceiveAllMethod != null)
-                    {
-                        // Get the generic type argument to create the right collection type
-                        var genericArg = block.GetType().GenericTypeArguments.FirstOrDefault();
-                        if (genericArg != null)
-                        {
-                            var listType = typeof(List<>).MakeGenericType(genericArg);
-                            var list = Activator.CreateInstance(listType);
-                            directTryReceiveAllMethod.Invoke(block, new[] { list });
-                        }
-                    }
-                }
-            }
-        }
-        catch
-        {
-            // Ignore any exceptions during cleanup - we're disposing anyway
         }
     }
 }
