@@ -9,8 +9,17 @@ namespace RtFlow.Pipelines.Core;
 public static class FluentPipeline
 {
     /// <summary>
-    /// Start a pipeline that buffers and propagates the same type.
+    /// Start a pipeline with a BufferBlock as the entry point.
     /// </summary>
+    /// <typeparam name="T">The type of data that flows through the initial buffer</typeparam>
+    /// <param name="configureBuffer">Optional action to configure the buffer block options</param>
+    /// <param name="cancellationToken">Optional cancellation token to control pipeline lifetime</param>
+    /// <returns>A fluent pipeline builder where input and output types are initially the same</returns>
+    /// <remarks>
+    /// The type parameters are initially the same (T,T) because the starting BufferBlock
+    /// both accepts and emits the same type. Subsequent transformation operations can change
+    /// the output type of the pipeline while preserving type safety through the fluent API.
+    /// </remarks>
     public static IFluentPipelineBuilder<T, T> Create<T>(
         Action<ExecutionDataflowBlockOptions> configureBuffer = null,
         CancellationToken cancellationToken = default)
@@ -23,12 +32,19 @@ public static class FluentPipeline
 
         var buffer = new BufferBlock<T>(opts);
         var inner = PipelineBuilder.BeginWith(buffer);
-        return new FluentPipelineBuilder<T, T>(inner, cancellationToken);
-    }
+        return new FluentPipelineBuilder<T, T>(inner, cancellationToken);    }
 
     /// <summary>
-    /// Start a pipeline from an existing propagator block.
+    /// Start a pipeline with an existing propagator block as the entry point.
+    /// The generic parameters <typeparamref name="TIn"/> and <typeparamref name="TOut"/> represent 
+    /// the input and output types of the provided block, allowing the pipeline to begin with 
+    /// any compatible block type and preserving type information for the fluent chain.
     /// </summary>
+    /// <typeparam name="TIn">The input type accepted by the propagator block</typeparam>
+    /// <typeparam name="TOut">The output type produced by the propagator block</typeparam>
+    /// <param name="head">The propagator block to use as the starting point of the pipeline</param>
+    /// <param name="cancellationToken">Optional cancellation token to control pipeline lifetime</param>
+    /// <returns>A fluent pipeline builder that can be used to continue building the pipeline</returns>
     public static IFluentPipelineBuilder<TIn, TOut> BeginWith<TIn, TOut>(
         IPropagatorBlock<TIn, TOut> head,
         CancellationToken cancellationToken = default)
