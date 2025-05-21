@@ -114,6 +114,93 @@ public class PipelineHub : IPipelineHub, IDisposable
     }
     
     /// <summary>
+    /// Gets a sink (target) pipeline with the specified name
+    /// </summary>
+    /// <typeparam name="T">The input type of the pipeline</typeparam>
+    /// <param name="pipelineName">The unique name of the pipeline</param>
+    /// <returns>The pipeline instance</returns>
+    public ITargetBlock<T> GetSinkPipeline<T>(string pipelineName)
+    {
+        if (string.IsNullOrEmpty(pipelineName))
+            throw new ArgumentException("Pipeline name cannot be null or empty", nameof(pipelineName));
+        
+        lock (_lock)
+        {
+            // If pipeline already exists, return it
+            if (_pipelines.TryGetValue(pipelineName, out var existingPipeline))
+            {
+                if (existingPipeline is ITargetBlock<T> typedPipeline)
+                    return typedPipeline;
+                
+                throw new InvalidOperationException(
+                    $"Pipeline '{pipelineName}' exists but with different types. " +
+                    $"Expected {typeof(ITargetBlock<T>).Name}, " + 
+                    $"found {existingPipeline.GetType().Name}");
+            }
+            
+            // Check if we have a definition for this pipeline
+            if (_pipelineDefinitions.TryGetValue(pipelineName, out var createFunc))
+            {
+                var pipeline = createFunc(_factory);
+                
+                if (pipeline is ITargetBlock<T> typedPipeline)
+                {
+                    _pipelines[pipelineName] = typedPipeline;
+                    return typedPipeline;
+                }
+                
+                throw new InvalidOperationException(
+                    $"Pipeline definition for '{pipelineName}' returned wrong type. " +
+                    $"Expected {typeof(ITargetBlock<T>).Name}, " + 
+                    $"got {pipeline.GetType().Name}");
+            }
+            
+            throw new InvalidOperationException(
+                $"Sink pipeline '{pipelineName}' does not exist and no creation function is defined");
+        }
+    }
+    
+    /// <summary>
+    /// Gets or creates a sink pipeline with the specified name using the provided creation function
+    /// </summary>
+    /// <typeparam name="T">The input type of the pipeline</typeparam>
+    /// <param name="pipelineName">The unique name of the pipeline</param>
+    /// <param name="createSinkPipeline">Function to create the sink pipeline if it doesn't exist</param>
+    /// <returns>The created sink pipeline</returns>
+    public ITargetBlock<T> GetOrCreateSinkPipeline<T>(
+        string pipelineName,
+        Func<IPipelineFactory, ITargetBlock<T>> createSinkPipeline)
+    {
+        if (string.IsNullOrEmpty(pipelineName))
+            throw new ArgumentException("Pipeline name cannot be null or empty", nameof(pipelineName));
+
+        ArgumentNullException.ThrowIfNull(createSinkPipeline);
+
+        lock (_lock)
+        {
+            // If pipeline already exists, return it
+            if (_pipelines.TryGetValue(pipelineName, out var existingPipeline))
+            {
+                if (existingPipeline is ITargetBlock<T> typedPipeline)
+                    return typedPipeline;
+                
+                throw new InvalidOperationException(
+                    $"Pipeline '{pipelineName}' exists but with different types. " +
+                    $"Expected {typeof(ITargetBlock<T>).Name}, " + 
+                    $"found {existingPipeline.GetType().Name}");
+            }
+            
+            // Store the pipeline creation function for later use
+            _pipelineDefinitions[pipelineName] = factory => createSinkPipeline(factory);
+            
+            // Create the pipeline
+            var pipeline = createSinkPipeline(_factory);
+            _pipelines[pipelineName] = pipeline;
+            return pipeline;
+        }
+    }
+    
+    /// <summary>
     /// Completes all pipelines when application is shutting down
     /// </summary>
     /// <returns>A task representing the completion of all pipelines</returns>

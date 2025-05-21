@@ -27,6 +27,25 @@ public interface IPipelineHub
     IPropagatorBlock<TIn, TOut> GetOrCreatePipeline<TIn, TOut>(
         string pipelineName,
         Func<IPipelineFactory, IPropagatorBlock<TIn, TOut>> createPipeline);
+        
+    /// <summary>
+    /// Gets a sink (target) pipeline with the specified name
+    /// </summary>
+    /// <typeparam name="T">The input type of the pipeline</typeparam>
+    /// <param name="pipelineName">The unique name of the pipeline</param>
+    /// <returns>The pipeline instance</returns>
+    ITargetBlock<T> GetSinkPipeline<T>(string pipelineName);
+    
+    /// <summary>
+    /// Gets or creates a sink pipeline with the specified name using the provided creation function
+    /// </summary>
+    /// <typeparam name="T">The input type of the pipeline</typeparam>
+    /// <param name="pipelineName">The unique name of the pipeline</param>
+    /// <param name="createSinkPipeline">Function to create the sink pipeline if it doesn't exist</param>
+    /// <returns>The created sink pipeline</returns>
+    ITargetBlock<T> GetOrCreateSinkPipeline<T>(
+        string pipelineName,
+        Func<IPipelineFactory, ITargetBlock<T>> createSinkPipeline);
     
     /// <summary>
     /// Completes all pipelines when application is shutting down
