@@ -18,6 +18,77 @@ namespace RtFlow.Pipelines.Tests
     }
 
     /// <summary>
+    /// Interface to represent a service that creates a pipeline.
+    /// </summary>
+    public interface IPipelineProvider<TIn, TOut>
+    {
+        IPropagatorBlock<TIn, TOut> GetPipeline();
+    }
+
+    /// <summary>
+    /// Service X - defines and starts the pipeline
+    /// </summary>
+    public class ServiceX : IPipelineProvider<string, int>
+    {
+        private readonly IPropagatorBlock<string, int> _pipeline;
+
+        public ServiceX(IPipelineFactory factory)
+        {
+            // Define pipeline that converts strings to integers
+            _pipeline = factory
+                .Create<string>()
+                .Transform(s => int.Parse(s))
+                .ToPipeline();
+        }
+
+        public IPropagatorBlock<string, int> GetPipeline() => _pipeline;
+    }
+
+    /// <summary>
+    /// Service Y - pushes data to the pipeline
+    /// </summary>
+    public class ServiceY
+    {
+        private readonly IPropagatorBlock<string, int> _pipeline;
+
+        public ServiceY(IPipelineProvider<string, int> pipelineProvider)
+        {
+            _pipeline = pipelineProvider.GetPipeline();
+        }
+
+        public async Task PushDataAsync(string data)
+        {
+            // Push data to the pipeline
+            await _pipeline.SendAsync(data);
+        }
+    }
+
+    /// <summary>
+    /// Service Z - consumes data from the pipeline
+    /// </summary>
+    public class ServiceZ
+    {
+        private readonly IPropagatorBlock<string, int> _pipeline;
+        private readonly List<int> _receivedData = new();
+
+        public ServiceZ(IPipelineProvider<string, int> pipelineProvider)
+        {
+            _pipeline = pipelineProvider.GetPipeline();
+        }
+
+        public async Task ConsumeDataAsync()
+        {
+            // Consume data from the pipeline
+            while (await DataflowBlock.OutputAvailableAsync(_pipeline))
+            {
+                _receivedData.Add(await DataflowBlock.ReceiveAsync(_pipeline));
+            }
+        }
+
+        public List<int> GetReceivedData() => _receivedData;
+    }
+
+    /// <summary>
     /// Tests that verify integration with host lifecycle and factory functionality.
     /// These tests focus on how pipelines interact with the host application lifetime.
     /// </summary>
@@ -78,6 +149,42 @@ namespace RtFlow.Pipelines.Tests
             // Assert: now cancellation propagates through head and all blocks
             await Assert.ThrowsAsync<TaskCanceledException>(async () =>
                 await Task.WhenAll(sendTask, pipeline.Completion));
+        }
+        
+        [Fact]
+        public async Task Pipeline_Created_In_ServiceX_Used_By_ServiceY_And_ServiceZ()
+        {
+            // Arrange
+            var lifetime = new FakeHostApplicationLifetime();
+            var factory = new PipelineFactory(lifetime);
+            
+            // Service X - Define and start pipeline
+            var serviceX = new ServiceX(factory);
+            
+            // Service Y - Push data to pipeline
+            var serviceY = new ServiceY(serviceX);
+            
+            // Service Z - Consume data from pipeline
+            var serviceZ = new ServiceZ(serviceX);
+            
+            // Act
+            var consumeTask = Task.Run(async () => await serviceZ.ConsumeDataAsync());
+            
+            // Push data from Service Y
+            await serviceY.PushDataAsync("123");
+            await serviceY.PushDataAsync("456");
+            await serviceY.PushDataAsync("789");
+            
+            // Complete the pipeline to allow the consumer to finish
+            serviceX.GetPipeline().Complete();
+            await consumeTask;
+            
+            // Assert
+            var receivedData = serviceZ.GetReceivedData();
+            Assert.Equal(3, receivedData.Count);
+            Assert.Equal(123, receivedData[0]);
+            Assert.Equal(456, receivedData[1]);
+            Assert.Equal(789, receivedData[2]);
         }
     }
 }
