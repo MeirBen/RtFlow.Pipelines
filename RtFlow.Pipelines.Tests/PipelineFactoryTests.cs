@@ -11,9 +11,9 @@ namespace RtFlow.Pipelines.Tests
     public class FakeHostApplicationLifetime : IHostApplicationLifetime
     {
         private readonly CancellationTokenSource _cts = new();
-        public CancellationToken ApplicationStarted   => CancellationToken.None;
+        public CancellationToken ApplicationStarted => CancellationToken.None;
         public CancellationToken ApplicationStopping => _cts.Token;
-        public CancellationToken ApplicationStopped  => CancellationToken.None;
+        public CancellationToken ApplicationStopped => CancellationToken.None;
         public void StopApplication() => _cts.Cancel();
     }
 
@@ -99,7 +99,7 @@ namespace RtFlow.Pipelines.Tests
         {
             // Arrange
             var lifetime = new FakeHostApplicationLifetime();
-            var factory  = new PipelineFactory(lifetime);
+            var factory = new PipelineFactory(lifetime);
 
             var pipeline = factory
                 .Create<int>()
@@ -124,7 +124,7 @@ namespace RtFlow.Pipelines.Tests
         {
             // Arrange
             var lifetime = new FakeHostApplicationLifetime();
-            var factory  = new PipelineFactory(lifetime);
+            var factory = new PipelineFactory(lifetime);
 
             // Give the head block the same shutdown token
             var headOpts = new ExecutionDataflowBlockOptions
@@ -150,35 +150,35 @@ namespace RtFlow.Pipelines.Tests
             await Assert.ThrowsAsync<TaskCanceledException>(async () =>
                 await Task.WhenAll(sendTask, pipeline.Completion));
         }
-        
+
         [Fact]
         public async Task Pipeline_Created_In_ServiceX_Used_By_ServiceY_And_ServiceZ()
         {
             // Arrange
             var lifetime = new FakeHostApplicationLifetime();
             var factory = new PipelineFactory(lifetime);
-            
+
             // Service X - Define and start pipeline
             var serviceX = new ServiceX(factory);
-            
+
             // Service Y - Push data to pipeline
             var serviceY = new ServiceY(serviceX);
-            
+
             // Service Z - Consume data from pipeline
             var serviceZ = new ServiceZ(serviceX);
-            
+
             // Act
             var consumeTask = Task.Run(async () => await serviceZ.ConsumeDataAsync());
-            
+
             // Push data from Service Y
             await serviceY.PushDataAsync("123");
             await serviceY.PushDataAsync("456");
             await serviceY.PushDataAsync("789");
-            
+
             // Complete the pipeline to allow the consumer to finish
             serviceX.GetPipeline().Complete();
             await consumeTask;
-            
+
             // Assert
             var receivedData = serviceZ.GetReceivedData();
             Assert.Equal(3, receivedData.Count);
