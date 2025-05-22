@@ -38,46 +38,101 @@ namespace RtFlow.Pipelines.Tests
         }
 
         [Fact]
-        public async Task Dispose_Completes_All_Pipelines()
+        public async Task DisposeAsync_Completes_All_Pipelines()
         {
-                        FakeHostApplicationLifetime lifetime = new FakeHostApplicationLifetime();
+            FakeHostApplicationLifetime lifetime = new FakeHostApplicationLifetime();
+            IPropagatorBlock<int, int> pipeline = null;
+            List<int> results = new List<int>();
 
             // Arrange
-            var hub = new PipelineHub(new PipelineFactory(lifetime));
-            var results = new List<int>();
-            var CancellationTokenSource = new CancellationTokenSource();
+            await using (PipelineHub hub = new PipelineHub(new PipelineFactory(lifetime)))
+            {
+                results = new List<int>();
+                var CancellationTokenSource = new CancellationTokenSource();
 
-            // Create a pipeline that stores results in a list
-            var pipeline = hub.GetOrCreatePipeline<int, int>("test", f =>
-                f.Create<int>()
-                 .Transform(i =>
-                 {
-                     results.Add(i);
-                     return i;
-                 })
-                 .ToPipeline());
+                // Create a pipeline that stores results in a list
+                pipeline = hub.GetOrCreatePipeline<int, int>("test", f =>
+                    f.Create<int>()
+                     .Transform(i =>
+                     {
+                         results.Add(i);
+                         return i;
+                     })
+                     .ToPipeline());
 
-            // Send some data
-            await pipeline.SendAsync(1);
-            await pipeline.SendAsync(2);
-            await pipeline.SendAsync(3);
+                // Send some data
+                await pipeline.SendAsync(1);
+                await pipeline.SendAsync(2);
+                await pipeline.SendAsync(3);
 
-            await Task.Delay(100); // Give some time for processing
+                await Task.Delay(100); // Give some time for processing
 
-            lifetime.StopApplication();
+                // Drain the pipeline
+                for (int i = 0; i < 3; i++)
+                {
+                    await pipeline.ReceiveAsync();
+                }
 
-            // Act - dispose the hub
-            ((IDisposable)hub).Dispose();
-
-            // Wait a bit for processing to complete
-            await Task.Delay(1000);
-
+                // Wait a bit for processing to complete
+                await Task.Delay(100);
+            }
             // Assert
-            Assert.True(pipeline.Completion.IsCanceled);
+            Assert.NotNull(pipeline);
+            Assert.NotEmpty(results);
+            Assert.True(pipeline.Completion.IsCompleted);
             Assert.Equal(3, results.Count);
             Assert.Contains(1, results);
             Assert.Contains(2, results);
             Assert.Contains(3, results);
+        }
+
+        [Fact]
+        public void Dispose_Completes_All_Pipelines_Synchronously()
+        {
+            // Arrange
+            FakeHostApplicationLifetime lifetime = new FakeHostApplicationLifetime();
+            var results = new List<int>();
+            var completionFlag = new ManualResetEvent(false);
+            ITargetBlock<int> pipeline = null;
+
+            // Create a hub with a pipeline that processes items slowly
+            using (var hub = new PipelineHub(new PipelineFactory(lifetime)))
+            {
+                // Create a pipeline with a buffer block to store the results
+                pipeline = hub.GetOrCreateSinkPipeline("test", f =>
+                {
+                    return f.Create<int>()
+                    .Transform(i =>
+                    {
+                        results.Add(i);
+                        return i;
+                    })
+                    .ToSink(x =>
+                    {
+                        if (x == 3)
+                        {
+                            // Simulate some processing time
+                            Thread.Sleep(100);
+                            completionFlag.Set(); // Signal that processing is complete
+                        }
+                    });
+                });
+
+                // Post some items
+                pipeline.Post(1);
+                pipeline.Post(2);
+                pipeline.Post(3);
+                // Give some time for processing to start
+                Thread.Sleep(100);
+            }
+
+            // Assert
+            Assert.True(pipeline.Completion.IsCompleted);
+            Assert.Equal(3, results.Count);
+            Assert.Contains(1, results);
+            Assert.Contains(2, results);
+            Assert.Contains(3, results);
+            Assert.True(completionFlag.WaitOne(1000), "Processing did not complete in time");
         }
 
         [Fact]

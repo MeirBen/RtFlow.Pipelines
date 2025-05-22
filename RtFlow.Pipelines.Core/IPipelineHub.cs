@@ -5,7 +5,7 @@ namespace RtFlow.Pipelines.Core;
 /// <summary>
 /// A central hub for accessing shared pipelines across services
 /// </summary>
-public interface IPipelineHub
+public interface IPipelineHub : IAsyncDisposable
 {
     /// <summary>
     /// Checks whether a pipeline with the specified name exists

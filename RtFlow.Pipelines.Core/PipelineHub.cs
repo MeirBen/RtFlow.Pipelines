@@ -5,13 +5,29 @@ namespace RtFlow.Pipelines.Core;
 /// <summary>
 /// A central hub for managing and sharing pipelines across services
 /// </summary>
-public class PipelineHub : IPipelineHub, IDisposable
+public class PipelineHub : IPipelineHub, IDisposable, IAsyncDisposable
 {
     private readonly IPipelineFactory _factory;
-    private readonly Dictionary<string, object> _pipelines = new();
-    private readonly Dictionary<string, Func<IPipelineFactory, object>> _pipelineDefinitions = new();
+    private readonly Dictionary<string, PipelineEntry> _pipelineEntries = new();
     private readonly object _lock = new();
     private bool _isDisposed;
+
+    /// <summary>
+    /// Represents an entry in the pipeline registry, containing both the instantiated pipeline and its creator function
+    /// </summary>
+    private class PipelineEntry
+    {
+        public object Instance { get; set; }
+        public Func<IPipelineFactory, object> Creator { get; set; }
+        public Type PipelineType { get; set; }
+
+        public PipelineEntry(object instance = null, Func<IPipelineFactory, object> creator = null, Type pipelineType = null)
+        {
+            Instance = instance;
+            Creator = creator;
+            PipelineType = pipelineType;
+        }
+    }
 
     /// <summary>
     /// Event that is raised when a pipeline is created
@@ -49,7 +65,7 @@ public class PipelineHub : IPipelineHub, IDisposable
 
         lock (_lock)
         {
-            return _pipelines.ContainsKey(pipelineName);
+            return _pipelineEntries.ContainsKey(pipelineName) && _pipelineEntries[pipelineName].Instance != null;
         }
     }
 
@@ -68,33 +84,38 @@ public class PipelineHub : IPipelineHub, IDisposable
 
         lock (_lock)
         {
-            // If pipeline already exists, return it
-            if (_pipelines.TryGetValue(pipelineName, out var existingPipeline))
+            // If pipeline already exists in our registry
+            if (_pipelineEntries.TryGetValue(pipelineName, out var entry))
             {
-                if (existingPipeline is IPropagatorBlock<TIn, TOut> typedPipeline)
-                    return typedPipeline;
-
-                throw new InvalidOperationException(
-                    $"Pipeline '{pipelineName}' exists but with different types. " +
-                    $"Expected {typeof(IPropagatorBlock<TIn, TOut>).Name}, " +
-                    $"found {existingPipeline.GetType().Name}");
-            }
-
-            // Check if we have a definition for this pipeline
-            if (_pipelineDefinitions.TryGetValue(pipelineName, out var createFunc))
-            {
-                var pipeline = createFunc(_factory);
-
-                if (pipeline is IPropagatorBlock<TIn, TOut> typedPipeline)
+                // If we have an instantiated pipeline
+                if (entry.Instance != null)
                 {
-                    _pipelines[pipelineName] = typedPipeline;
-                    return typedPipeline;
+                    if (entry.Instance is IPropagatorBlock<TIn, TOut> typedPipeline)
+                        return typedPipeline;
+
+                    throw new InvalidOperationException(
+                        $"Pipeline '{pipelineName}' exists but with different types. " +
+                        $"Expected {typeof(IPropagatorBlock<TIn, TOut>).Name}, " +
+                        $"found {entry.Instance.GetType().Name}");
                 }
 
-                throw new InvalidOperationException(
-                    $"Pipeline definition for '{pipelineName}' returned wrong type. " +
-                    $"Expected {typeof(IPropagatorBlock<TIn, TOut>).Name}, " +
-                    $"got {pipeline.GetType().Name}");
+                // We have a creator but no instance yet
+                if (entry.Creator != null)
+                {
+                    var pipeline = entry.Creator(_factory);
+
+                    if (pipeline is IPropagatorBlock<TIn, TOut> typedPipeline)
+                    {
+                        entry.Instance = typedPipeline;
+                        entry.PipelineType = typeof(IPropagatorBlock<TIn, TOut>);
+                        return typedPipeline;
+                    }
+
+                    throw new InvalidOperationException(
+                        $"Pipeline definition for '{pipelineName}' returned wrong type. " +
+                        $"Expected {typeof(IPropagatorBlock<TIn, TOut>).Name}, " +
+                        $"got {pipeline.GetType().Name}");
+                }
             }
 
             throw new InvalidOperationException(
@@ -122,23 +143,25 @@ public class PipelineHub : IPipelineHub, IDisposable
         lock (_lock)
         {
             // If pipeline already exists, return it
-            if (_pipelines.TryGetValue(pipelineName, out var existingPipeline))
+            if (_pipelineEntries.TryGetValue(pipelineName, out var entry) && entry.Instance != null)
             {
-                if (existingPipeline is IPropagatorBlock<TIn, TOut> typedPipeline)
+                if (entry.Instance is IPropagatorBlock<TIn, TOut> typedPipeline)
                     return typedPipeline;
 
                 throw new InvalidOperationException(
                     $"Pipeline '{pipelineName}' exists but with different types. " +
                     $"Expected {typeof(IPropagatorBlock<TIn, TOut>).Name}, " +
-                    $"found {existingPipeline.GetType().Name}");
+                    $"found {entry.Instance.GetType().Name}");
             }
 
-            // Store the pipeline creation function for later use
-            _pipelineDefinitions[pipelineName] = factory => createPipeline(factory);
+            // Store the pipeline creation function and create the pipeline
+            Func<IPipelineFactory, object> wrapperFunc = factory => createPipeline(factory);
 
-            // Create the pipeline
             var pipeline = createPipeline(_factory);
-            _pipelines[pipelineName] = pipeline;
+            _pipelineEntries[pipelineName] = new PipelineEntry(
+                pipeline,
+                wrapperFunc,
+                typeof(IPropagatorBlock<TIn, TOut>));
 
             // Raise PipelineCreated event
             PipelineCreated?.Invoke(this, new PipelineCreatedEventArgs(pipelineName, typeof(IPropagatorBlock<TIn, TOut>)));
@@ -163,33 +186,38 @@ public class PipelineHub : IPipelineHub, IDisposable
 
         lock (_lock)
         {
-            // If pipeline already exists, return it
-            if (_pipelines.TryGetValue(pipelineName, out var existingPipeline))
+            // If pipeline entry exists
+            if (_pipelineEntries.TryGetValue(pipelineName, out var entry))
             {
-                if (existingPipeline is ITargetBlock<T> typedPipeline)
-                    return typedPipeline;
-
-                throw new InvalidOperationException(
-                    $"Pipeline '{pipelineName}' exists but with different types. " +
-                    $"Expected {typeof(ITargetBlock<T>).Name}, " +
-                    $"found {existingPipeline.GetType().Name}");
-            }
-
-            // Check if we have a definition for this pipeline
-            if (_pipelineDefinitions.TryGetValue(pipelineName, out var createFunc))
-            {
-                var pipeline = createFunc(_factory);
-
-                if (pipeline is ITargetBlock<T> typedPipeline)
+                // If we have an instantiated pipeline
+                if (entry.Instance != null)
                 {
-                    _pipelines[pipelineName] = typedPipeline;
-                    return typedPipeline;
+                    if (entry.Instance is ITargetBlock<T> typedPipeline)
+                        return typedPipeline;
+
+                    throw new InvalidOperationException(
+                        $"Pipeline '{pipelineName}' exists but with different types. " +
+                        $"Expected {typeof(ITargetBlock<T>).Name}, " +
+                        $"found {entry.Instance.GetType().Name}");
                 }
 
-                throw new InvalidOperationException(
-                    $"Pipeline definition for '{pipelineName}' returned wrong type. " +
-                    $"Expected {typeof(ITargetBlock<T>).Name}, " +
-                    $"got {pipeline.GetType().Name}");
+                // We have a creator but no instance yet
+                if (entry.Creator != null)
+                {
+                    var pipeline = entry.Creator(_factory);
+
+                    if (pipeline is ITargetBlock<T> typedPipeline)
+                    {
+                        entry.Instance = typedPipeline;
+                        entry.PipelineType = typeof(ITargetBlock<T>);
+                        return typedPipeline;
+                    }
+
+                    throw new InvalidOperationException(
+                        $"Pipeline definition for '{pipelineName}' returned wrong type. " +
+                        $"Expected {typeof(ITargetBlock<T>).Name}, " +
+                        $"got {pipeline.GetType().Name}");
+                }
             }
 
             throw new InvalidOperationException(
@@ -216,23 +244,25 @@ public class PipelineHub : IPipelineHub, IDisposable
         lock (_lock)
         {
             // If pipeline already exists, return it
-            if (_pipelines.TryGetValue(pipelineName, out var existingPipeline))
+            if (_pipelineEntries.TryGetValue(pipelineName, out var entry) && entry.Instance != null)
             {
-                if (existingPipeline is ITargetBlock<T> typedPipeline)
+                if (entry.Instance is ITargetBlock<T> typedPipeline)
                     return typedPipeline;
 
                 throw new InvalidOperationException(
                     $"Pipeline '{pipelineName}' exists but with different types. " +
                     $"Expected {typeof(ITargetBlock<T>).Name}, " +
-                    $"found {existingPipeline.GetType().Name}");
+                    $"found {entry.Instance.GetType().Name}");
             }
 
-            // Store the pipeline creation function for later use
-            _pipelineDefinitions[pipelineName] = factory => createSinkPipeline(factory);
+            // Create the pipeline and store it
+            Func<IPipelineFactory, object> wrapperFunc = factory => createSinkPipeline(factory);
 
-            // Create the pipeline
             var pipeline = createSinkPipeline(_factory);
-            _pipelines[pipelineName] = pipeline;
+            _pipelineEntries[pipelineName] = new PipelineEntry(
+                pipeline,
+                wrapperFunc,
+                typeof(ITargetBlock<T>));
 
             // Raise PipelineCreated event
             PipelineCreated?.Invoke(this, new PipelineCreatedEventArgs(pipelineName, typeof(ITargetBlock<T>)));
@@ -256,12 +286,7 @@ public class PipelineHub : IPipelineHub, IDisposable
 
         lock (_lock)
         {
-            bool removed = _pipelines.Remove(pipelineName);
-            if (removed)
-            {
-                _pipelineDefinitions.Remove(pipelineName);
-            }
-            return removed;
+            return _pipelineEntries.Remove(pipelineName);
         }
     }
 
@@ -276,16 +301,18 @@ public class PipelineHub : IPipelineHub, IDisposable
         lock (_lock)
         {
             // Complete all pipelines
-            foreach (var pipeline in _pipelines.Values)
+            foreach (var entry in _pipelineEntries.Values)
             {
-                if (pipeline is IDataflowBlock dataflowBlock)
+                if (entry.Instance is IDataflowBlock dataflowBlock)
                 {
                     dataflowBlock.Complete();
                 }
             }
 
             // Collect completion tasks
-            completionTasks = _pipelines.Values
+            completionTasks = _pipelineEntries.Values
+                .Where(entry => entry.Instance != null)
+                .Select(entry => entry.Instance)
                 .OfType<IDataflowBlock>()
                 .Select(p => p.Completion)
                 .ToList();
@@ -313,18 +340,102 @@ public class PipelineHub : IPipelineHub, IDisposable
 
             _isDisposed = true;
 
-            // Complete all pipelines
-            foreach (var pipeline in _pipelines.Values)
+            // Mark all pipelines for completion
+            foreach (var entry in _pipelineEntries.Values)
             {
-                if (pipeline is IDataflowBlock dataflowBlock && !dataflowBlock.Completion.IsCompleted)
+                if (entry.Instance is IDataflowBlock dataflowBlock && !dataflowBlock.Completion.IsCompleted)
+                {
+                    dataflowBlock.Complete();
+                }
+            }
+        }
+
+        // Get all pipeline completion tasks - outside of lock to avoid deadlocks
+        var completionTasks = _pipelineEntries.Values
+            .Where(entry => entry.Instance != null)
+            .Select(entry => entry.Instance)
+            .OfType<IDataflowBlock>()
+            .Select(p => p.Completion)
+            .ToList();
+
+        // Wait for all pipelines to complete processing
+        if (completionTasks.Count > 0)
+        {
+            try
+            {
+                // Using WaitAll instead of async to ensure synchronous completion in Dispose
+                Task.WaitAll(completionTasks.ToArray());
+            }
+            catch (AggregateException ex)
+            {
+                // Log or handle any pipeline completion exceptions
+                // In a dispose method we don't want to throw, just log the errors
+                foreach (var innerEx in ex.InnerExceptions)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error during pipeline completion: {innerEx.Message}");
+                }
+            }
+        }
+
+        // Clear the collections at the end
+        _pipelineEntries.Clear();
+
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Asynchronously disposes all resources used by the pipeline hub,
+    /// ensuring all pipelines complete their processing
+    /// </summary>
+    /// <returns>A task representing the async dispose operation</returns>
+    public async ValueTask DisposeAsync()
+    {
+        if (_isDisposed)
+            return;
+
+        List<Task> completionTasks;
+
+        lock (_lock)
+        {
+            if (_isDisposed)
+                return;
+
+            _isDisposed = true;
+
+            // Mark all pipelines for completion
+            foreach (var entry in _pipelineEntries.Values)
+            {
+                if (entry.Instance is IDataflowBlock dataflowBlock && !dataflowBlock.Completion.IsCompleted)
                 {
                     dataflowBlock.Complete();
                 }
             }
 
-            _pipelines.Clear();
-            _pipelineDefinitions.Clear();
+            // Collect completion tasks
+            completionTasks = [.. _pipelineEntries.Values
+                .Where(entry => entry.Instance != null)
+                .Select(entry => entry.Instance)
+                .OfType<IDataflowBlock>()
+                .Select(p => p.Completion)];
         }
+
+        // Wait for all pipelines to complete processing
+        if (completionTasks.Count > 0)
+        {
+            try
+            {
+                await Task.WhenAll(completionTasks).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                // Log or handle any pipeline completion exceptions
+                // In a dispose method we don't want to throw, just log the errors
+                System.Diagnostics.Debug.WriteLine($"Error during pipeline completion: {ex.Message}");
+            }
+        }
+
+        // Clear the collections at the end
+        _pipelineEntries.Clear();
 
         GC.SuppressFinalize(this);
     }
