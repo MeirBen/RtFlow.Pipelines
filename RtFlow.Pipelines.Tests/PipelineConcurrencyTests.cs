@@ -27,7 +27,7 @@ namespace RtFlow.Pipelines.Tests
             for (int i = 0; i < 100; i++)
             {
                 tasks.Add(Task.Run(() =>
-                    hub.GetOrCreatePipeline<string, int>("concurrent", createFunc)));
+                    hub.GetOrCreatePipeline("concurrent", createFunc)));
             }
 
             await Task.WhenAll(tasks);
@@ -51,7 +51,7 @@ namespace RtFlow.Pipelines.Tests
                 var CancellationTokenSource = new CancellationTokenSource();
 
                 // Create a pipeline that stores results in a list
-                pipeline = hub.GetOrCreatePipeline<int, int>("test", f =>
+                pipeline = hub.GetOrCreatePipeline("test", f =>
                     f.Create<int>()
                      .Transform(i =>
                      {
@@ -138,36 +138,40 @@ namespace RtFlow.Pipelines.Tests
         [Fact]
         public async Task Data_Flows_Through_Multiple_Connected_Pipelines()
         {
+            List<double> results;
+
             // Arrange
-            var hub = new PipelineHub(new PipelineFactory(new FakeHostApplicationLifetime()));
-            var results = new List<double>();
-
-            // First pipeline: string -> int
-            var p1 = hub.GetOrCreatePipeline<string, int>("p1", f =>
-                f.Create<string>().Transform(s => int.Parse(s)).ToPipeline());
-
-            // Second pipeline: int -> double
-            var p2 = hub.GetOrCreatePipeline<int, double>("p2", f =>
-                f.Create<int>().Transform(i => i * 1.5).ToPipeline());
-
-            // Setup to collect results
-            var consumer = new ActionBlock<double>(results.Add);
-            p2.LinkTo(consumer, new DataflowLinkOptions { PropagateCompletion = true });
-
-            // Act
-            await p1.SendAsync("10");
-            await p1.SendAsync("20");
-            p1.Complete();
-
-            // Manually connect pipelines
-            while (await p1.OutputAvailableAsync())
+            using (var hub = new PipelineHub(new PipelineFactory(new FakeHostApplicationLifetime())))
             {
-                var value = await p1.ReceiveAsync();
-                await p2.SendAsync(value);
-            }
-            p2.Complete();
+                results = new List<double>();
 
-            await consumer.Completion;
+                // First pipeline: string -> int
+                var p1 = hub.GetOrCreatePipeline("p1", f =>
+                    f.Create<string>().Transform(s => int.Parse(s)).ToPipeline());
+
+                // Second pipeline: int -> double
+                var p2 = hub.GetOrCreateSinkPipeline("p2", f =>
+                    f.Create<int>().Transform(i => i * 1.5).
+                    ToSink(x =>
+                    {
+                        // Simulate some processing time
+                        Thread.Sleep(100);
+                        results.Add(x);
+                    }));
+
+                // Act
+                await p1.SendAsync("10");
+                await p1.SendAsync("20");
+
+                p1.Complete();
+
+                // Manually connect pipelines
+                while (await p1.OutputAvailableAsync())
+                {
+                    var value = await p1.ReceiveAsync();
+                    await p2.SendAsync(value);
+                }
+            }
 
             // Assert
             Assert.Equal(2, results.Count);

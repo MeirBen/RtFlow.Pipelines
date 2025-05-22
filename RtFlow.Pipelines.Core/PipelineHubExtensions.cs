@@ -21,7 +21,7 @@ public static class PipelineHubExtensions
     {
         parseFunction ??= int.Parse;
         
-        return hub.GetOrCreatePipeline<string, int>(
+        return hub.GetOrCreatePipeline(
             pipelineName,
             factory => factory
                 .Create<string>()
@@ -45,7 +45,7 @@ public static class PipelineHubExtensions
         Func<TIn, TOut> transformFunction,
         Action<ExecutionDataflowBlockOptions> configureOptions = null)
     {
-        return hub.GetOrCreatePipeline<TIn, TOut>(
+        return hub.GetOrCreatePipeline(
             pipelineName,
             factory => factory
                 .Create<TIn>(configureOptions)
@@ -69,7 +69,7 @@ public static class PipelineHubExtensions
         Func<TIn, CancellationToken, Task<TOut>> transformAsyncFunction,
         Action<ExecutionDataflowBlockOptions> configureOptions = null)
     {
-        return hub.GetOrCreatePipeline<TIn, TOut>(
+        return hub.GetOrCreatePipeline(
             pipelineName,
             factory => factory
                 .Create<TIn>(configureOptions)
@@ -92,7 +92,7 @@ public static class PipelineHubExtensions
         Action<T> action,
         Action<ExecutionDataflowBlockOptions> configureOptions = null)
     {
-        return hub.GetOrCreateSinkPipeline<T>(
+        return hub.GetOrCreateSinkPipeline(
             pipelineName,
             factory => factory
                 .Create<T>(configureOptions)
@@ -115,7 +115,7 @@ public static class PipelineHubExtensions
         Func<T, Task> asyncAction,
         Action<ExecutionDataflowBlockOptions> configureOptions = null)
     {
-        return hub.GetOrCreateSinkPipeline<T>(
+        return hub.GetOrCreateSinkPipeline(
             pipelineName,
             factory => factory
                 .Create<T>(configureOptions)
@@ -138,7 +138,7 @@ public static class PipelineHubExtensions
         Func<T, CancellationToken, Task> asyncAction,
         Action<ExecutionDataflowBlockOptions> configureOptions = null)
     {
-        return hub.GetOrCreateSinkPipeline<T>(
+        return hub.GetOrCreateSinkPipeline(
             pipelineName,
             factory => factory
                 .Create<T>(configureOptions)
@@ -164,7 +164,7 @@ public static class PipelineHubExtensions
         Action<TOut> action,
         Action<ExecutionDataflowBlockOptions> configureOptions = null)
     {
-        return hub.GetOrCreateSinkPipeline<TIn>(
+        return hub.GetOrCreateSinkPipeline(
             pipelineName,
             factory => factory
                 .Create<TIn>(configureOptions)

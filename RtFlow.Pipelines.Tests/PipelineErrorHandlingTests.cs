@@ -75,7 +75,7 @@ namespace RtFlow.Pipelines.Tests
         {
             // Arrange
             var hub = new PipelineHub(new PipelineFactory(new FakeHostApplicationLifetime()));
-            hub.GetOrCreatePipeline<string, int>("test", f =>
+            hub.GetOrCreatePipeline("test", f =>
                 f.Create<string>().Transform(s => int.Parse(s)).ToPipeline());
 
             // Act & Assert
@@ -104,12 +104,12 @@ namespace RtFlow.Pipelines.Tests
             };
 
             // Create normal pipeline
-            var normalPipeline = hub.GetOrCreatePipeline<int, int>(
+            var normalPipeline = hub.GetOrCreatePipeline(
                 "normal",
                 f => f.Create<int>().Transform(i => i * 2).ToPipeline());
 
             // Create faulting pipeline
-            var faultingPipeline = hub.GetOrCreatePipeline<string, int>(
+            var faultingPipeline = hub.GetOrCreatePipeline(
                 "faulting",
                 f => f.Create<string>().Transform<int>(s =>
                 {
@@ -160,7 +160,7 @@ namespace RtFlow.Pipelines.Tests
         {
             // Arrange
             var hub = new PipelineHub(new PipelineFactory(new FakeHostApplicationLifetime()));
-            hub.GetOrCreatePipeline<string, int>("test", f =>
+            hub.GetOrCreatePipeline("test", f =>
                 f.Create<string>().Transform(s => int.Parse(s)).ToPipeline());
 
             // Verify pipeline exists

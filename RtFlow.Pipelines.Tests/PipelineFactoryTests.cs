@@ -30,7 +30,7 @@ namespace RtFlow.Pipelines.Tests
             _pipelineHub = pipelineHub;
 
             // Initialize the pipeline if it doesn't exist
-            _pipelineHub.GetOrCreatePipeline<string, int>(
+            _pipelineHub.GetOrCreatePipeline(
                 PipelineName,
                 factory => factory
                     .Create<string>()
@@ -107,7 +107,7 @@ namespace RtFlow.Pipelines.Tests
             _pipelineHub = pipelineHub;
 
             // Initialize the logging sink if it doesn't exist yet
-            _pipelineHub.GetOrCreateSinkPipeline<string>(
+            _pipelineHub.GetOrCreateSinkPipeline(
                 LogPipelineName,
                 factory => factory
                     .Create<string>()
@@ -142,7 +142,7 @@ namespace RtFlow.Pipelines.Tests
             _pipelineHub = pipelineHub;
 
             // Example of a more complex pipeline with a sink at the end
-            _pipelineHub.GetOrCreateSinkPipeline<KeyValuePair<string, double>>(
+            _pipelineHub.GetOrCreateSinkPipeline(
                 MetricsPipelineName,
                 factory => factory
                     .Create<KeyValuePair<string, double>>()
@@ -182,7 +182,7 @@ namespace RtFlow.Pipelines.Tests
 
             var pipeline = factory
                 .Create<int>()
-                .TransformAsync<int>(async (x, ct) =>
+                .TransformAsync(async (x, ct) =>
                 {
                     await Task.Delay(Timeout.Infinite, ct);
                     return x;
@@ -213,8 +213,8 @@ namespace RtFlow.Pipelines.Tests
             var head = new BufferBlock<string>(headOpts);
 
             var pipeline = factory
-                .BeginWith<string, string>(head)
-                .TransformAsync<string>(async (s, ct) =>
+                .BeginWith(head)
+                .TransformAsync(async (s, ct) =>
                 {
                     await Task.Delay(Timeout.Infinite, ct);
                     return s;
@@ -274,19 +274,19 @@ namespace RtFlow.Pipelines.Tests
             var hub = new PipelineHub(factory);
 
             // Create multiple pipelines with different types
-            var stringToIntPipeline = hub.GetOrCreatePipeline<string, int>(
+            var stringToIntPipeline = hub.GetOrCreatePipeline(
                 "StringToInt",
                 f => f.Create<string>()
                     .Transform(s => int.Parse(s))
                     .ToPipeline());
 
-            var intToDoublePipeline = hub.GetOrCreatePipeline<int, double>(
+            var intToDoublePipeline = hub.GetOrCreatePipeline(
                 "IntToDouble",
                 f => f.Create<int>()
                     .Transform(i => i * 1.5)
                     .ToPipeline());
 
-            var stringReverserPipeline = hub.GetOrCreatePipeline<string, string>(
+            var stringReverserPipeline = hub.GetOrCreatePipeline(
                 "StringReverser",
                 f => f.Create<string>()
                     .Transform(s => new string(s.Reverse().ToArray()))
