@@ -1,0 +1,111 @@
+# Visual Studio / VS Code / Rider
+.vs/
+.idea/
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build output
+bin/
+obj/
+artifacts/
+
+# Rider caches
+*.DotSettings.user
+
+# Resharper
+_ReSharper*/
+*.ReSharper.user
+_ReSharper.*
+
+# The packages folder can be ignored because of PackageReference restore
+**/packages/*
+!**/packages/build/**
+
+# Uncomment if you have project.lock.json
+# project.lock.json
+
+# NuGet v3
+*.nuget.props
+*.nuget.targets
+
+# Dotnet CLI
+.project.cache.json
+*.dbmdl
+
+# MSBuild
+*.cache
+*.log
+msbuild.log
+
+# Entity Framework
+Migrations/ 
+# (if you want to keep migrations in source control, remove the above)
+
+# Local DB
+*.mdf
+*.ldf
+*.ndf
+
+# IIS Express
+/.vs/**/IISExpress/ 
+
+# Publish output
+**/publish/
+**/publish_outputs/
+
+# Web runtime and static files
+wwwroot/dist/
+wwwroot/node_modules/
+
+# npm & Yarn
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Bower
+bower_components/
+
+# OS files
+*.DS_Store
+Thumbs.db
+
+# JetBrains Rider local history
+.idea/**/localHistory/
+
+# JetBrains Rider build artifacts
+.idea/**/workspace.xml
+
+# DotCover
+*.dotCover
+
+# Coverage
+coverage/
+*.coverage
+*.coveragexml
+
+# Test results
+TestResults/
+*.trx
+*.TestResults
+
+# Temporary files
+*.tmp
+*.temp
+
+# Logs
+logs/
+*.log
+
+# Certificates
+*.pfx
+*.cer
+
+# If you use Azure Functions
+.local.settings.json
+# End of https://www.toptal.com/developers/gitignore/api/visualstudio,visualstudiocode,rider,windows,node
+

@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    
+    <!-- NuGet Package Properties -->
+    <PackageId>RtFlow.Pipelines.Core</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Meir Ben</Authors>
+    <Company>RtFlow</Company>
+    <Product>RtFlow.Pipelines</Product>
+    <Description>A powerful, fluent API for building high-throughput, resilient data processing pipelines using .NET's TPL Dataflow library. Core functionality with comprehensive cancellation support and lifecycle management.</Description>
+    <PackageTags>pipeline;dataflow;tpl;streaming;async;cancellation;fluent;high-performance</PackageTags>
+    <PackageProjectUrl>https://github.com/MeirBen/RtFlow.Pipelines</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/MeirBen/RtFlow.Pipelines</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReleaseNotes>Initial release with fluent pipeline API, cancellation support, and comprehensive testing.</PackageReleaseNotes>
+    <Copyright>Copyright © $(Authors) 2025</Copyright>
+        
+    <!-- Package Build Properties -->
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PackageOutputPath>../nupkgs</PackageOutputPath>
+    <IncludeSymbols>true</IncludeSymbols>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    
+    <!-- Source Link -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
