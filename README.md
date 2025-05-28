@@ -13,7 +13,6 @@
 - [🏗️ Core Components](#️-core-components)
 - [🔧 Advanced Configuration](#-advanced-configuration)
 - [🚫 Cancellation Support](#-cancellation-support)
-- [🏠 ASP.NET Core Integration](#-aspnet-core-integration)
 - [💡 Common Use Cases](#-common-use-cases)
 - [❓ Troubleshooting](#-troubleshooting)
 - [🧪 Testing](#-testing)
@@ -30,22 +29,14 @@
 - **📦 Batching** - Group elements into batches for efficient bulk processing
 - **🏗️ Pipeline Hub** - Share and manage named pipelines across services
 - **🔍 Side-effects** - Add monitoring, logging, or metrics collection without changing data flow
-- **🏠 ASP.NET Core Integration** - Lifecycle management via HostedService
 - **⚙️ Advanced Configuration** - Fine-grained control over execution options and parallelism
 
 ## 📦 Installation
 
-Install the packages you need for your scenario:
+Install the RtFlow.Pipelines.Core package:
 
 ```bash
-# Core functionality (required)
 dotnet add package RtFlow.Pipelines.Core
-
-# Optional: Extensions for advanced scenarios
-dotnet add package RtFlow.Pipelines.Extensions
-
-# Optional: ASP.NET Core hosting integration
-dotnet add package RtFlow.Pipelines.Hosting
 ```
 
 ## 🚀 Quick Start
@@ -364,106 +355,6 @@ var pipeline2 = hub.GetOrCreatePipeline("ProcessB", factory => /* ... */);
 
 // Disposing hub gracefully shuts down all managed pipelines
 await hub.DisposeAsync(); // All pipelines receive cancellation and complete gracefully
-```
-
-## 🏠 ASP.NET Core Integration
-
-### Basic Setup
-
-```csharp
-// Program.cs
-var builder = WebApplication.CreateBuilder(args);
-
-// Register pipeline infrastructure
-builder.Services.AddSingleton<IPipelineFactory, PipelineFactory>();
-builder.Services.AddSingleton<IPipelineHub, PipelineHub>();
-
-// Register your services that use pipelines
-builder.Services.AddScoped<OrderProcessingService>();
-builder.Services.AddScoped<LoggingService>();
-
-var app = builder.Build();
-```
-
-### Service Integration
-
-```csharp
-public class OrderProcessingService
-{
-    private readonly IPipelineHub _hub;
-    private readonly ILogger<OrderProcessingService> _logger;
-
-    public OrderProcessingService(IPipelineHub hub, ILogger<OrderProcessingService> logger)
-    {
-        _hub = hub;
-        _logger = logger;
-        
-        // Initialize processing pipeline
-        InitializeOrderPipeline();
-    }
-
-    private void InitializeOrderPipeline()
-    {
-        _hub.GetOrCreateSinkPipeline(
-            "OrderProcessing",
-            factory => factory
-                .Create<Order>()
-                .TransformAsync(async (order, ct) => await ValidateOrderAsync(order, ct))
-                .Tap(order => _logger.LogInformation("Processing order {OrderId}", order.Id))
-                .TransformAsync(async (order, ct) => await ProcessPaymentAsync(order, ct))
-                .Batch(10) // Process payments in batches
-                .ToSinkAsync(async (batch, ct) => await SaveOrdersAsync(batch, ct))
-        );
-    }
-
-    public async Task ProcessOrderAsync(Order order)
-    {
-        var pipeline = _hub.GetSinkPipeline<Order>("OrderProcessing");
-        await pipeline.SendAsync(order);
-    }
-}
-```
-
-### Hosted Service Integration
-
-```csharp
-public class DataProcessingHostedService : BackgroundService
-{
-    private readonly IPipelineHub _hub;
-    private readonly IServiceProvider _serviceProvider;
-
-    public DataProcessingHostedService(IPipelineHub hub, IServiceProvider serviceProvider)
-    {
-        _hub = hub;
-        _serviceProvider = serviceProvider;
-    }
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        // Create data processing pipeline
-        var processingPipeline = _hub.GetOrCreateSinkPipeline(
-            "DataProcessor",
-            factory => factory
-                .Create<DataEvent>(opts => opts.CancellationToken = stoppingToken)
-                .TransformAsync(async (evt, ct) => await ProcessEventAsync(evt, ct))
-                .ToSinkAsync(async (result, ct) => await PublishResultAsync(result, ct))
-        );
-
-        // Process incoming data until cancellation
-        try
-        {
-            await foreach (var dataEvent in GetDataStreamAsync(stoppingToken))
-            {
-                await processingPipeline.SendAsync(dataEvent);
-            }
-        }
-        finally
-        {
-            // Pipeline will be gracefully shut down when hub is disposed
-            // by the hosting infrastructure
-        }
-    }
-}
 ```
 
 ## 🧪 Testing
