@@ -55,20 +55,6 @@ dotnet pack RtFlow.Pipelines.Core/RtFlow.Pipelines.Core.csproj \
     --output $OUTPUT_DIR \
     --verbosity minimal
 
-echo -e "${BLUE}  📦 Packaging RtFlow.Pipelines.Extensions...${NC}"
-dotnet pack RtFlow.Pipelines.Extensions/RtFlow.Pipelines.Extensions.csproj \
-    --configuration $CONFIGURATION \
-    --no-build \
-    --output $OUTPUT_DIR \
-    --verbosity minimal
-
-echo -e "${BLUE}  📦 Packaging RtFlow.Pipelines.Hosting...${NC}"
-dotnet pack RtFlow.Pipelines.Hosting/RtFlow.Pipelines.Hosting.csproj \
-    --configuration $CONFIGURATION \
-    --no-build \
-    --output $OUTPUT_DIR \
-    --verbosity minimal
-
 echo ""
 echo -e "${GREEN}🎉 Package creation completed successfully!${NC}"
 echo -e "${BLUE}📁 Packages created in: ${OUTPUT_DIR}/${NC}"
