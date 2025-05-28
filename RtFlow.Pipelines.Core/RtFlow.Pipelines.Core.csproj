@@ -11,7 +11,7 @@
     
     <!-- NuGet Package Properties -->
     <PackageId>RtFlow.Pipelines.Core</PackageId>
-    <Version>1.6.0</Version>
+    <Version>1.7.0</Version>
     <Authors>Meir Ben</Authors>
     <Title>RtFlow Pipelines Core Library</Title>
     <Summary>Fluent API for building high-performance data processing pipelines using TPL Dataflow</Summary>
