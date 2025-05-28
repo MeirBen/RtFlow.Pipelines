@@ -20,17 +20,6 @@
     <Category>Libraries</Category>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     
-    <!-- Release Notes -->
-    <PackageReleaseNotes>
-      v1.2.0:
-      - Enhanced fluent API with comprehensive pipeline operations
-      - Improved cancellation support with factory-level coordination
-      - Advanced batching with configurable options
-      - Pipeline Hub for centralized management
-      - Comprehensive documentation and examples
-      - Performance optimizations and memory efficiency improvements
-    </PackageReleaseNotes>
-        
     <!-- Package Build Properties -->
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <PackageOutputPath>../nupkgs</PackageOutputPath>
