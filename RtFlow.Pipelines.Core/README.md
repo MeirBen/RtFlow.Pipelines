@@ -69,9 +69,3 @@ For comprehensive documentation, advanced examples, and best practices:
 MIT License - see [LICENSE](https://github.com/MeirBen/RtFlow.Pipelines/blob/main/LICENSE) for details.
 
 ```
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/MeirBen/RtFlow.Pipelines/blob/main/LICENSE) file for details.
-
----
