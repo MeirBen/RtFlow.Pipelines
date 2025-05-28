@@ -66,6 +66,6 @@ For comprehensive documentation, advanced examples, and best practices:
 
 ## 📄 License
 
+```
 MIT License - see [LICENSE](https://github.com/MeirBen/RtFlow.Pipelines/blob/main/LICENSE) for details.
-
 ```
