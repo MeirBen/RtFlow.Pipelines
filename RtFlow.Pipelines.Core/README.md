@@ -75,5 +75,3 @@ MIT License - see [LICENSE](https://github.com/MeirBen/RtFlow.Pipelines/blob/mai
 This project is licensed under the MIT License - see the [LICENSE](https://github.com/MeirBen/RtFlow.Pipelines/blob/main/LICENSE) file for details.
 
 ---
-
-For the complete documentation and examples, visit the [main project repository](https://github.com/MeirBen/RtFlow.Pipelines).
