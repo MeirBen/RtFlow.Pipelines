@@ -2,38 +2,55 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <LangVersion>latest</LangVersion>
+    <IsPackable>true</IsPackable>
+    
+    <!-- Assembly Information -->
+    <AssemblyTitle>RtFlow.Pipelines.Core</AssemblyTitle>
+    <AssemblyDescription>High-performance fluent data processing pipelines for .NET</AssemblyDescription>
+    <AssemblyConfiguration>Release</AssemblyConfiguration>
     
     <!-- NuGet Package Properties -->
     <PackageId>RtFlow.Pipelines.Core</PackageId>
     <Version>1.2.0</Version>
+    <FileVersion>1.2.0.0</FileVersion>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
     <Authors>Meir Ben</Authors>
-    <Company>RtFlow</Company>
-    <Product>RtFlow.Pipelines</Product>
-    <Description>A powerful, fluent API for building high-throughput, resilient data processing pipelines using .NET's TPL Dataflow library. Core functionality with comprehensive cancellation support and lifecycle management.</Description>
-    <PackageTags>pipeline;dataflow;tpl;streaming;async;cancellation;fluent;high-performance</PackageTags>
-    <PackageProjectUrl>https://github.com/MeirBen/RtFlow.Pipelines</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/MeirBen/RtFlow.Pipelines</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <PackageReleaseNotes>Initial release with fluent pipeline API, cancellation support, and comprehensive testing.</PackageReleaseNotes>
-    <Copyright>Copyright © $(Authors) 2025</Copyright>
+    <Title>RtFlow Pipelines Core Library</Title>
+    <Summary>Fluent API for building high-performance data processing pipelines using TPL Dataflow</Summary>
+    <Description>RtFlow.Pipelines.Core provides a powerful, fluent API for building high-throughput, resilient data processing pipelines using .NET's TPL Dataflow library. Features include type-safe pipeline construction, comprehensive cancellation support, batching operations, pipeline hubs for service management, and enterprise-grade lifecycle management.</Description>
+    <PackageTags>pipeline;dataflow;tpl;streaming;async;cancellation;fluent;high-performance;batch-processing;reactive;producer-consumer;backpressure</PackageTags>
+    <Category>Libraries</Category>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    
+    <!-- Release Notes -->
+    <PackageReleaseNotes>
+      v1.2.0:
+      - Enhanced fluent API with comprehensive pipeline operations
+      - Improved cancellation support with factory-level coordination
+      - Advanced batching with configurable options
+      - Pipeline Hub for centralized management
+      - Comprehensive documentation and examples
+      - Performance optimizations and memory efficiency improvements
+    </PackageReleaseNotes>
         
     <!-- Package Build Properties -->
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <PackageOutputPath>../nupkgs</PackageOutputPath>
     <IncludeSymbols>true</IncludeSymbols>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     
-    <!-- Source Link -->
-    <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <EmbedUntrackedSources>true</EmbedUntrackedSources>
-    <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
+    <!-- Documentation -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn> <!-- Missing XML comment warnings -->
   </PropertyGroup>
 
+  <!-- Package Dependencies -->
+  <ItemGroup>
+    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="8.0.1" />
+  </ItemGroup>
+
+  <!-- Package Content -->
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>

@@ -1,0 +1,35 @@
+<!-- Directory.Build.props: Shared properties for all projects in the solution -->
+<Project>
+  
+  <PropertyGroup>
+    <!-- Common Build Settings -->
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <WarningsNotAsErrors />
+    
+    <!-- Common Assembly Properties -->
+    <Company>RtFlow</Company>
+    <Product>RtFlow.Pipelines</Product>
+    <Copyright>Copyright © Meir Ben 2025</Copyright>
+    
+    <!-- Common Repository Information -->
+    <RepositoryUrl>https://github.com/MeirBen/RtFlow.Pipelines</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/MeirBen/RtFlow.Pipelines</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    
+    <!-- Source Control -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <!-- Common Package References for Source Linking -->
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>

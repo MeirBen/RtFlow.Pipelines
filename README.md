@@ -1,8 +1,13 @@
 # RtFlow.Pipelines
 
 [![NuGet](https://img.shields.io/nuget/v/RtFlow.Pipelines.Core.svg)](https://www.nuget.org/packages/RtFlow.Pipelines.Core)
+[![Downloads](https://img.shields.io/nuget/dt/RtFlow.Pipelines.Core.svg)](https://www.nuget.org/packages/RtFlow.Pipelines.Core)
+[![License](https://img.shields.io/github/license/MeirBen/RtFlow.Pipelines.svg)](https://github.com/MeirBen/RtFlow.Pipelines/blob/main/LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg)](https://dotnet.microsoft.com/download/dotnet/8.0)
 
-**RtFlow.Pipelines** is a powerful, fluent API for building high-throughput, resilient data processing pipelines using .NET's TPL Dataflow library. It simplifies the creation of complex data processing workflows with an intuitive, chainable syntax while providing enterprise-grade features like graceful shutdown, cancellation support, and lifecycle management.
+**Build high-performance data processing pipelines with a fluent, intuitive API** 🚀
+
+RtFlow.Pipelines transforms complex data processing workflows into elegant, maintainable code using .NET's powerful TPL Dataflow library. Perfect for ETL operations, message processing, real-time analytics, and any scenario requiring high-throughput data transformation.
 
 ## 📋 Table of Contents
 
@@ -21,14 +26,16 @@
 
 ## ✨ Key Features
 
-- **🔗 Fluent API** - Build complex data pipelines with an intuitive, chainable syntax
-- **🛡️ Type-safe** - Strongly-typed pipeline stages with compile-time checking  
-- **⚡ High Performance** - Built on TPL Dataflow with back-pressure and bounded capacity control
-- **🚫 Cancellation Support** - Graceful pipeline shutdown with comprehensive CancellationToken integration
-- **📦 Batching** - Group elements into batches for efficient bulk processing
-- **🏗️ Pipeline Hub** - Share and manage named pipelines across services
-- **🔍 Side-effects** - Add monitoring, logging, or metrics collection without changing data flow
-- **⚙️ Advanced Configuration** - Fine-grained control over execution options and parallelism
+- 🔗 **Fluent API** - Build complex data pipelines with an intuitive, chainable syntax
+- ⚡ **High Performance** - Built on TPL Dataflow with back-pressure and bounded capacity control
+- 🛡️ **Type-safe** - Strongly-typed pipeline stages with compile-time checking  
+- 🚫 **Cancellation Support** - Graceful pipeline shutdown with comprehensive CancellationToken integration
+- 📦 **Advanced Batching** - Group elements with size and time-based batching strategies
+- 🏗️ **Pipeline Hub** - Centralized management and sharing of named pipelines across services
+- 🔍 **Observability** - Built-in monitoring, logging, and metrics collection without changing data flow
+- ⚙️ **Fine-grained Control** - Advanced configuration for execution options and parallelism
+- 🔄 **Async-first** - Full async/await support with cancellation token propagation
+- 🎯 **Memory Efficient** - Controlled memory usage with configurable buffer sizes
 
 ## 📦 Installation
 
