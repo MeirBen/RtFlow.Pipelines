@@ -16,9 +16,9 @@ namespace RtFlow.Pipelines.Core
             _cancellationToken = cancellationToken;
         }
 
-    public IFluentPipelineBuilder<TIn, TNext> Transform<TNext>(
-        Func<TOut, TNext> selector,
-        Action<ExecutionDataflowBlockOptions> configure = null)
+        public IFluentPipelineBuilder<TIn, TNext> Transform<TNext>(
+            Func<TOut, TNext> selector,
+            Action<ExecutionDataflowBlockOptions> configure = null)
         {
             ArgumentNullException.ThrowIfNull(selector);
 
@@ -36,9 +36,9 @@ namespace RtFlow.Pipelines.Core
             return new FluentPipelineBuilder<TIn, TNext>(nextBuilder, _cancellationToken);
         }
 
-    public IFluentPipelineBuilder<TIn, TNext> TransformAsync<TNext>(
-        Func<TOut, Task<TNext>> selector,
-        Action<ExecutionDataflowBlockOptions> configure = null)
+        public IFluentPipelineBuilder<TIn, TNext> TransformAsync<TNext>(
+            Func<TOut, Task<TNext>> selector,
+            Action<ExecutionDataflowBlockOptions> configure = null)
         {
             ArgumentNullException.ThrowIfNull(selector);
 
@@ -56,9 +56,9 @@ namespace RtFlow.Pipelines.Core
             return new FluentPipelineBuilder<TIn, TNext>(nextBuilder, _cancellationToken);
         }
 
-    public IFluentPipelineBuilder<TIn, TNext> TransformAsync<TNext>(
-        Func<TOut, CancellationToken, Task<TNext>> selector,
-        Action<ExecutionDataflowBlockOptions> configure = null)
+        public IFluentPipelineBuilder<TIn, TNext> TransformAsync<TNext>(
+            Func<TOut, CancellationToken, Task<TNext>> selector,
+            Action<ExecutionDataflowBlockOptions> configure = null)
         {
             ArgumentNullException.ThrowIfNull(selector);
 
@@ -76,8 +76,8 @@ namespace RtFlow.Pipelines.Core
             return new FluentPipelineBuilder<TIn, TNext>(nextBuilder, _cancellationToken);
         }
 
-    public IFluentPipelineBuilder<TIn, TOut> Tap(
-        Action<TOut> sideEffect)
+        public IFluentPipelineBuilder<TIn, TOut> Tap(
+            Action<TOut> sideEffect)
         {
             ArgumentNullException.ThrowIfNull(sideEffect);
             return Transform(t =>
@@ -87,8 +87,8 @@ namespace RtFlow.Pipelines.Core
             });
         }
 
-    public IFluentPipelineBuilder<TIn, TOut> TapAsync(
-        Func<TOut, Task> sideEffect)
+        public IFluentPipelineBuilder<TIn, TOut> TapAsync(
+            Func<TOut, Task> sideEffect)
         {
             ArgumentNullException.ThrowIfNull(sideEffect);
             return TransformAsync(async t =>
@@ -98,8 +98,8 @@ namespace RtFlow.Pipelines.Core
             });
         }
 
-    public IFluentPipelineBuilder<TIn, TOut> TapAsync(
-        Func<TOut, CancellationToken, Task> sideEffect)
+        public IFluentPipelineBuilder<TIn, TOut> TapAsync(
+            Func<TOut, CancellationToken, Task> sideEffect)
         {
             ArgumentNullException.ThrowIfNull(sideEffect);
             return TransformAsync(async (t, ct) =>
@@ -109,9 +109,9 @@ namespace RtFlow.Pipelines.Core
             });
         }
 
-    public IFluentPipelineBuilder<TIn, TOut[]> Batch(
-        int batchSize,
-        Action<GroupingDataflowBlockOptions> configure = null)
+        public IFluentPipelineBuilder<TIn, TOut[]> Batch(
+            int batchSize,
+            Action<GroupingDataflowBlockOptions> configure = null)
         {
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
 
@@ -119,7 +119,7 @@ namespace RtFlow.Pipelines.Core
             {
                 CancellationToken = _cancellationToken
             };
-            
+
             // If no BoundedCapacity is specified, set it to at least batchSize
             // This is required as BatchBlock requires BoundedCapacity >= batchSize
             // BUGFIX: Without this check, the pipeline would throw ArgumentOutOfRangeException
@@ -127,9 +127,9 @@ namespace RtFlow.Pipelines.Core
             {
                 opts.BoundedCapacity = batchSize;
             }
-            
+
             configure?.Invoke(opts);
-            
+
             // Re-check after configure is called to ensure BoundedCapacity is still valid
             // This ensures that even if the user sets a smaller BoundedCapacity in the configure action,
             // we still ensure it's at least equal to batchSize to prevent exceptions
@@ -143,9 +143,9 @@ namespace RtFlow.Pipelines.Core
             return new FluentPipelineBuilder<TIn, TOut[]>(nextBuilder, _cancellationToken);
         }
 
-    public ITargetBlock<TIn> ToSink(
-        Action<TOut> action,
-        Action<ExecutionDataflowBlockOptions> configure = null)
+        public ITargetBlock<TIn> ToSink(
+            Action<TOut> action,
+            Action<ExecutionDataflowBlockOptions> configure = null)
         {
             ArgumentNullException.ThrowIfNull(action);
 
@@ -159,9 +159,9 @@ namespace RtFlow.Pipelines.Core
             return _inner.LinkTo(sink).ToPipeline();
         }
 
-    public ITargetBlock<TIn> ToSinkAsync(
-        Func<TOut, Task> action,
-        Action<ExecutionDataflowBlockOptions> configure = null)
+        public ITargetBlock<TIn> ToSinkAsync(
+            Func<TOut, Task> action,
+            Action<ExecutionDataflowBlockOptions> configure = null)
         {
             ArgumentNullException.ThrowIfNull(action);
 
@@ -175,9 +175,9 @@ namespace RtFlow.Pipelines.Core
             return _inner.LinkTo(sink).ToPipeline();
         }
 
-    public ITargetBlock<TIn> ToSinkAsync(
-        Func<TOut, CancellationToken, Task> action,
-        Action<ExecutionDataflowBlockOptions> configure = null)
+        public ITargetBlock<TIn> ToSinkAsync(
+            Func<TOut, CancellationToken, Task> action,
+            Action<ExecutionDataflowBlockOptions> configure = null)
         {
             ArgumentNullException.ThrowIfNull(action);
 
