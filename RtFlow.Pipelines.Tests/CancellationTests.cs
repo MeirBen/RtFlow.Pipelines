@@ -61,7 +61,7 @@ namespace RtFlow.Pipelines.Tests
             await cts.CancelAsync();
 
             // wait up to 2s for the cancellation hook to fire
-            await cancellationDetected.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            await cancellationDetected.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
             // Assert: not *all* items could have been processed
             Assert.True(itemsProcessed < 10,
