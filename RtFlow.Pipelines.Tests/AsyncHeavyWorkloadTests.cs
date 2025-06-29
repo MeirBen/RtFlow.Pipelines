@@ -138,14 +138,14 @@ namespace RtFlow.Pipelines.Tests
                         opts.BoundedCapacity = 5000;
                     }
                 )
-                .TransformAsync(
-                    item => Task.FromResult(new FactorStats
+                .Transform(
+                    item => new FactorStats
                     {
                         Value = item.Value,
                         Factors = item.Factors,
                         FactorCount = item.Factors.Count,
                         FactorSum = item.Factors.Sum()
-                    })
+                    }
                 )
                 .Batch(
                     batchSize,
